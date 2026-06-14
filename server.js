@@ -9,9 +9,9 @@ const path = require('path');
 let oebb = null;
 try {
     oebb = require('oebb-api');
-    console.log('✅ ÖBB API loaded');
+    console.log('✅ ÖBB API loaded successfully');
 } catch (error) {
-    console.log('⚠️ ÖBB API not available - using web search for transport');
+    console.log('⚠️ ÖBB API not available - using web search for transport queries');
 }
 
 const app = express();
@@ -183,7 +183,7 @@ let botConfig = {
     
     safetyRules: `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never share other guests' data. If uncertain about an answer, say so honestly. Block abusive language with one neutral warning.`,
     
-    styleRules: `Use natural, conversational language. Be warm and friendly. Use occasional emojis sparingly (😊, 👍, 🏨). Keep responses concise but complete. Never end a conversation abruptly. Always leave the door open for follow-up questions.`,
+    styleRules: `Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines. Use bullet points for lists. **NEVER use bold for passwords, codes, or credentials.** Write dates in clear format like "24 May, 2026". Show prices with currency symbol followed by "per night" or "total." Use natural, conversational language. Be warm and friendly. Use occasional emojis sparingly (😊, 👍, 🏨). Keep responses concise but complete. Never end a conversation abruptly. Always leave the door open for follow-up questions.`,
     
     websiteContent: "",
     customRules: [],
@@ -193,7 +193,7 @@ let botConfig = {
 
 // ========== LIMITS CONFIGURATION ==========
 let limitsConfig = {
-    maxTokensPerResponse: 200,  // Increased for more conversational responses
+    maxTokensPerResponse: 200,
     maxMessagesPerSession: 20,
     maxQuestionsPerMinute: 10,
     dailyQuota: 500,
@@ -202,11 +202,10 @@ let limitsConfig = {
 
 const usageTracker = new Map();
 
-// ========== EXPANDED TOPIC FILTER (Now allows confirmations) ==========
+// ========== EXPANDED TOPIC FILTER ==========
 const ALLOWED_TOPICS = {
     hotel: /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|room type|bed|bathroom|amenities|address|location|street|where are you|hotel address/i,
     
-    // Added conversational patterns
     conversational: /^(just|only|really|so|ok|okay|thanks|thank you|great|perfect|got it|i see|ah|oh|hmm|yes|no|yeah|sure|right|correct|exactly)$/i,
     confirmation: /(just|only|really)\?$|is that (all|it|correct)|so that's it|that's all|nothing else/i,
     
@@ -255,10 +254,10 @@ function isQuestionAllowed(question) {
     }
     
     let isAllowed = false;
-    for (const [topic, pattern] of Object.entries(ALLOWED_TOPICS)) {
+    for (const [category, pattern] of Object.entries(ALLOWED_TOPICS)) {
         if (pattern.test(lowerQuestion)) {
             isAllowed = true;
-            analytics.questionsByCategory[topic]++;
+            analytics.questionsByCategory[category]++;
             break;
         }
     }
@@ -271,7 +270,7 @@ function isQuestionAllowed(question) {
     if (!isAllowed) {
         analytics.questionsByCategory.other++;
         analytics.blockedQuestions++;
-        return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, attractions, directions, and the hotel address. What would you like to know?" };
+        return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, attractions, directions, and the hotel address. What would you like to know? 😊" };
     }
     return { allowed: true, reason: null };
 }
@@ -534,7 +533,7 @@ STYLE: ${botConfig.styleRules}
 
 ${languageInstructions[detectedLang] || languageInstructions.english}
 
-${isConfirmation ? "This is a follow-up/confirmation question. Respond warmly and conversationally. For example, if they ask 'just internet?', say 'That's right! Just internet - nice and simple.' Keep it friendly!" : ""}
+${isConfirmation ? "This is a follow-up/confirmation question. Respond warmly and conversationally. For example, if they ask 'just internet?', say 'That's right! Just internet - nice and simple. Need anything else?' Keep it friendly!" : ""}
 
 ${transportInfo ? `REAL-TIME TRANSPORT:${transportInfo}\n` : ""}
 
@@ -549,13 +548,13 @@ ${isBookingQuestion ? `Booking link: ${botConfig.bookingLink}` : ''}
 
 GUEST: ${userQuestion}
 
-Be warm, conversational, and helpful. Keep responses friendly but not too long.`;
+Be warm, conversational, and helpful. Keep responses friendly but not too long. Use occasional emojis like 😊 or 👍. Never use bold or special formatting for passwords. If giving a password, present it as plain text.`;
 
     try {
         const apiRequest = {
             model: "deepseek-chat",
             messages: [{ role: "user", content: systemPrompt }],
-            temperature: 0.7,  // Increased for more natural conversation
+            temperature: 0.7,
             max_tokens: limitsConfig.maxTokensPerResponse
         };
         if (botConfig.webSearchEnabled && isLocalInfoQuestion) apiRequest.search_enabled = true;
@@ -592,6 +591,8 @@ app.listen(PORT, () => {
     console.log(`\n✅ Conversational Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
     console.log(`💬 Personality: Warm, friendly, conversational`);
+    console.log(`🔑 Password formatting: Plain text (no bold)`);
     console.log(`🚍 ÖBB Transport: ${oebb ? 'ENABLED' : 'DISABLED (using web search)'}`);
-    console.log(`🌍 Languages: English, German, Chinese\n`);
+    console.log(`🌍 Languages: English, German, Chinese`);
+    console.log(`😊 Temperature: 0.7 (natural conversation)\n`);
 });
