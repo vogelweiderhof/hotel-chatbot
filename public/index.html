@@ -2,25 +2,26 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Smart Hotel AI Assistant</title>
+    <title>Hotel AI Assistant - Admin</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; display: flex; gap: 20px; flex-wrap: wrap; }
-        .setup-panel, .rules-panel, .chat-panel {
+        .container { max-width: 1600px; margin: 0 auto; display: flex; gap: 20px; flex-wrap: wrap; }
+        .setup-panel, .rules-panel, .limits-panel, .chat-panel {
             background: white;
             border-radius: 10px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .setup-panel { flex: 1.2; min-width: 280px; }
+        .setup-panel { flex: 1; min-width: 260px; }
         .rules-panel { flex: 1; min-width: 260px; }
-        .chat-panel { flex: 1.5; min-width: 350px; }
-        h2, h3 { margin-bottom: 15px; color: #333; }
+        .limits-panel { flex: 0.8; min-width: 240px; }
+        .chat-panel { flex: 1.2; min-width: 350px; }
+        h2, h3 { margin-bottom: 15px; color: #333; font-size: 1.2rem; }
         input, textarea, select {
             width: 100%;
-            padding: 10px;
-            margin: 8px 0;
+            padding: 8px;
+            margin: 6px 0;
             border: 1px solid #ddd;
             border-radius: 5px;
         }
@@ -28,15 +29,19 @@
             background: #0066cc;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 5px;
             cursor: pointer;
             margin: 5px 0;
             width: 100%;
         }
         button:hover { background: #0052a3; }
-        button.secondary { background: #6c757d; }
         button.success { background: #28a745; }
+        button.danger { background: #dc3545; }
+        .status { margin-top: 10px; padding: 8px; border-radius: 5px; font-size: 12px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
         .messages {
             height: 400px;
             overflow-y: auto;
@@ -46,71 +51,36 @@
             margin-bottom: 10px;
             background: #f9f9f9;
         }
-        .user-msg {
-            text-align: right;
-            margin: 10px;
-            padding: 8px 12px;
-            background: #0066cc;
-            color: white;
-            border-radius: 15px;
-            display: inline-block;
-            float: right;
-            clear: both;
-            max-width: 80%;
-        }
-        .bot-msg {
-            text-align: left;
-            margin: 10px;
-            padding: 8px 12px;
-            background: #e9ecef;
-            color: black;
-            border-radius: 15px;
-            display: inline-block;
-            float: left;
-            clear: both;
-            max-width: 80%;
-        }
-        .status { margin-top: 10px; padding: 10px; border-radius: 5px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        .rule-badge {
-            background: #e9ecef;
-            padding: 5px 10px;
-            border-radius: 15px;
-            margin: 5px;
-            display: inline-block;
-            font-size: 12px;
-        }
-        hr { margin: 20px 0; }
+        .user-msg { text-align: right; margin: 8px; padding: 6px 10px; background: #0066cc; color: white; border-radius: 12px; display: inline-block; float: right; clear: both; max-width: 80%; font-size: 13px; }
+        .bot-msg { text-align: left; margin: 8px; padding: 6px 10px; background: #e9ecef; border-radius: 12px; display: inline-block; float: left; clear: both; max-width: 80%; font-size: 13px; }
+        .limit-input { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+        .limit-input label { flex: 1; font-size: 13px; }
+        .limit-input input { flex: 1; width: auto; margin: 0; }
+        .limit-input span { font-size: 12px; color: #666; width: 60px; }
+        hr { margin: 15px 0; }
         .toggle-switch {
             display: flex;
             align-items: center;
             justify-content: space-between;
             background: #f8f9fa;
-            padding: 10px;
+            padding: 8px;
             border-radius: 8px;
-            margin: 10px 0;
-        }
-        .toggle-label {
-            font-weight: bold;
+            margin: 8px 0;
         }
         .toggle-button {
-            width: 50px;
-            height: 25px;
+            width: 44px;
+            height: 22px;
             background: #ccc;
-            border-radius: 25px;
+            border-radius: 22px;
             cursor: pointer;
             position: relative;
             transition: 0.3s;
         }
-        .toggle-button.active {
-            background: #28a745;
-        }
+        .toggle-button.active { background: #28a745; }
         .toggle-button::after {
             content: '';
-            width: 21px;
-            height: 21px;
+            width: 18px;
+            height: 18px;
             background: white;
             border-radius: 50%;
             position: absolute;
@@ -118,88 +88,172 @@
             left: 3px;
             transition: 0.3s;
         }
-        .toggle-button.active::after {
-            left: 26px;
-        }
+        .toggle-button.active::after { left: 23px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Left Panel: Initial Setup -->
+        <!-- Panel 1: Setup -->
         <div class="setup-panel">
-            <h2>🏨 1. Initial Setup</h2>
-            <label>Hotel Website URL (optional):</label>
-            <input type="text" id="websiteUrl" placeholder="https://your-hotel.com">
-            
-            <label>Bot Personality:</label>
-            <textarea id="personality" rows="2">You are a friendly hotel front desk agent named Alex.</textarea>
-            
+            <h2>🏨 1. Setup</h2>
+            <label>Hotel URL (optional):</label>
+            <input type="text" id="websiteUrl" placeholder="https://...">
+            <label>Personality:</label>
+            <textarea id="personality" rows="2">You are a friendly hotel front desk agent.</textarea>
             <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="2">Never swear. Stay child-friendly. Avoid controversial topics.</textarea>
-            
+            <textarea id="safetyRules" rows="2">Never swear. Stay child-friendly.</textarea>
             <label>Style Rules:</label>
-            <textarea id="styleRules" rows="2">Be concise. Answer in 1-2 sentences. Be helpful.</textarea>
-            
+            <textarea id="styleRules" rows="2">Be concise. Answer in 1-2 sentences.</textarea>
             <button onclick="setupBot()">📥 Load Setup</button>
             <div id="status"></div>
         </div>
         
-        <!-- Middle Panel: Live Rules -->
+        <!-- Panel 2: Live Rules -->
         <div class="rules-panel">
-            <h2>⚙️ 2. Live Rules</h2>
-            
+            <h2>⚙️ 2. Bot Rules</h2>
+            <label>Live Personality:</label>
+            <textarea id="livePersonality" rows="2"></textarea>
+            <label>Live Safety:</label>
+            <textarea id="liveSafety" rows="2"></textarea>
+            <label>Live Style:</label>
+            <textarea id="liveStyle" rows="2"></textarea>
             <div class="toggle-switch">
-                <span class="toggle-label">🔍 Web Search (Local Info)</span>
+                <span>🔍 Web Search</span>
                 <div id="webSearchToggle" class="toggle-button" onclick="toggleWebSearch()"></div>
             </div>
-            
-            <label>Personality (Live):</label>
-            <textarea id="livePersonality" rows="2"></textarea>
-            
-            <label>Safety Rules (Live):</label>
-            <textarea id="liveSafety" rows="2"></textarea>
-            
-            <label>Style Rules (Live):</label>
-            <textarea id="liveStyle" rows="2"></textarea>
-            
-            <label>Custom Rules:</label>
-            <div style="display: flex; gap: 5px;">
-                <input type="text" id="newCustomRule" placeholder="e.g., Always be polite" style="flex:1">
-                <button onclick="addCustomRule()" style="width: auto;">+</button>
-            </div>
-            <div id="customRulesList" class="rule-list"></div>
-            
-            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules Now</button>
-            
+            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
             <hr>
-            <h3>📖 Active Rules</h3>
-            <div id="activeRulesDisplay"></div>
-            
-            <hr>
-            <div class="info" style="padding: 10px; font-size: 12px;">
-                💡 <strong>Smart Features:</strong><br>
-                • Hotel policy questions → Answers from FAQ<br>
-                • Local info (weather, restaurants) → Web search<br>
-                • Booking questions → Directs to booking link
-            </div>
+            <div id="activeRulesDisplay" style="font-size: 12px;"></div>
         </div>
         
-        <!-- Right Panel: Chat -->
-        <div class="chat-panel">
-            <h2>💬 3. Smart Hotel Assistant</h2>
-            <div class="messages" id="messages">
-                <div class="bot-msg">👋 Hello! I'm your smart hotel assistant. I can answer questions about the hotel AND search the web for local info like weather, restaurants, and attractions. Just ask!</div>
+        <!-- Panel 3: Limits Control -->
+        <div class="limits-panel">
+            <h2>🛡️ 3. Limits</h2>
+            <div class="limit-input">
+                <label>Tokens/response:</label>
+                <input type="number" id="maxTokens" min="50" max="500" step="10">
+                <span>tokens</span>
             </div>
-            <input type="text" id="question" placeholder="Ask about hotel policies, local weather, restaurants, or attractions..." 
-                   onkeypress="if(event.key==='Enter') sendMessage()">
-            <button onclick="sendMessage()">Send Message</button>
+            <div class="limit-input">
+                <label>Msgs/session:</label>
+                <input type="number" id="maxSession" min="5" max="50" step="1">
+                <span>messages</span>
+            </div>
+            <div class="limit-input">
+                <label>Msgs/minute:</label>
+                <input type="number" id="maxPerMinute" min="5" max="30" step="1">
+                <span>/min</span>
+            </div>
+            <div class="limit-input">
+                <label>Daily quota:</label>
+                <input type="number" id="dailyQuota" min="20" max="200" step="10">
+                <span>/day</span>
+            </div>
+            <div class="toggle-switch">
+                <span>🚫 Topic Filter</span>
+                <div id="topicFilterToggle" class="toggle-button" onclick="toggleTopicFilter()"></div>
+            </div>
+            <button onclick="saveLimits()" class="success">💾 Save Limits</button>
+            <button onclick="loadLimits()">📋 Refresh</button>
+            <hr>
+            <div id="limitsDisplay" style="font-size: 11px; color: #666;"></div>
+        </div>
+        
+        <!-- Panel 4: Chat -->
+        <div class="chat-panel">
+            <h2>💬 4. Test Chat</h2>
+            <div class="messages" id="messages">
+                <div class="bot-msg">👋 Admin panel ready! Configure limits above.</div>
+            </div>
+            <input type="text" id="question" placeholder="Test the bot..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">Send</button>
         </div>
     </div>
     
     <script>
         let botReady = false;
-        let customRulesList = [];
         let webSearchEnabled = true;
+        let topicFilterEnabled = true;
+        
+        // Load current limits from server
+        async function loadLimits() {
+            try {
+                const response = await fetch('/api/limits');
+                const limits = await response.json();
+                document.getElementById('maxTokens').value = limits.maxTokensPerResponse;
+                document.getElementById('maxSession').value = limits.maxMessagesPerSession;
+                document.getElementById('maxPerMinute').value = limits.maxQuestionsPerMinute;
+                document.getElementById('dailyQuota').value = limits.dailyQuota;
+                topicFilterEnabled = limits.topicFilterEnabled;
+                updateTopicFilterToggle();
+                displayLimits();
+                console.log('Limits loaded:', limits);
+            } catch(e) { console.error('Failed to load limits'); }
+        }
+        
+        // Save limits to server
+        async function saveLimits() {
+            const limits = {
+                maxTokensPerResponse: parseInt(document.getElementById('maxTokens').value),
+                maxMessagesPerSession: parseInt(document.getElementById('maxSession').value),
+                maxQuestionsPerMinute: parseInt(document.getElementById('maxPerMinute').value),
+                dailyQuota: parseInt(document.getElementById('dailyQuota').value),
+                topicFilterEnabled: topicFilterEnabled
+            };
+            
+            try {
+                const response = await fetch('/api/limits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(limits)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    addMessage('bot', '✅ Limits updated successfully!');
+                    displayLimits();
+                }
+            } catch(e) { addMessage('bot', '❌ Failed to save limits'); }
+        }
+        
+        function displayLimits() {
+            const tokens = document.getElementById('maxTokens').value;
+            const session = document.getElementById('maxSession').value;
+            const minute = document.getElementById('maxPerMinute').value;
+            const daily = document.getElementById('dailyQuota').value;
+            document.getElementById('limitsDisplay').innerHTML = `
+                📊 Current: ${tokens} tokens | ${session} msgs/session | ${minute}/min | ${daily}/day<br>
+                🚫 Topic Filter: ${topicFilterEnabled ? 'ON' : 'OFF'}
+            `;
+        }
+        
+        function updateTopicFilterToggle() {
+            const toggle = document.getElementById('topicFilterToggle');
+            if (topicFilterEnabled) toggle.classList.add('active');
+            else toggle.classList.remove('active');
+        }
+        
+        function toggleTopicFilter() {
+            topicFilterEnabled = !topicFilterEnabled;
+            updateTopicFilterToggle();
+            displayLimits();
+        }
+        
+        function updateWebSearchToggle() {
+            const toggle = document.getElementById('webSearchToggle');
+            if (webSearchEnabled) toggle.classList.add('active');
+            else toggle.classList.remove('active');
+        }
+        
+        async function toggleWebSearch() {
+            webSearchEnabled = !webSearchEnabled;
+            updateWebSearchToggle();
+            await fetch('/api/toggle-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: webSearchEnabled })
+            });
+            addMessage('bot', `🔍 Web search ${webSearchEnabled ? 'enabled' : 'disabled'}`);
+        }
         
         async function setupBot() {
             const websiteUrl = document.getElementById('websiteUrl').value;
@@ -216,31 +270,22 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ websiteUrl, personality, safetyRules, styleRules })
                 });
-                
                 const data = await response.json();
-                
                 if (data.success) {
                     botReady = true;
-                    statusDiv.innerHTML = '<div class="success">✅ Smart bot ready! Can answer hotel questions AND search the web for local info.</div>';
+                    statusDiv.innerHTML = '<div class="success">✅ Bot ready!</div>';
                     document.getElementById('livePersonality').value = personality;
                     document.getElementById('liveSafety').value = safetyRules;
                     document.getElementById('liveStyle').value = styleRules;
-                    addMessage('bot', 'Setup complete! I can now help with hotel policies AND find local info like weather, restaurants, and attractions. What would you like to know?');
+                    addMessage('bot', 'Setup complete! Limits are active.');
                     loadCurrentRules();
                 } else {
-                    statusDiv.innerHTML = '<div class="error">❌ ' + data.error + '</div>';
+                    statusDiv.innerHTML = '<div class="error">❌ Failed</div>';
                 }
-            } catch (error) {
-                statusDiv.innerHTML = '<div class="error">❌ Connection error</div>';
-            }
+            } catch(e) { statusDiv.innerHTML = '<div class="error">❌ Connection error</div>'; }
         }
         
         async function updateRulesOnly() {
-            if (!botReady) {
-                alert('Please complete setup first');
-                return;
-            }
-            
             const personality = document.getElementById('livePersonality').value;
             const safetyRules = document.getElementById('liveSafety').value;
             const styleRules = document.getElementById('liveStyle').value;
@@ -248,70 +293,9 @@
             await fetch('/api/update-rules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ personality, safetyRules, styleRules, customRules: customRulesList, webSearchEnabled })
+                body: JSON.stringify({ personality, safetyRules, styleRules, webSearchEnabled })
             });
-            
             addMessage('bot', '✨ Rules updated!');
-            displayActiveRules();
-        }
-        
-        async function toggleWebSearch() {
-            webSearchEnabled = !webSearchEnabled;
-            const toggle = document.getElementById('webSearchToggle');
-            if (webSearchEnabled) {
-                toggle.classList.add('active');
-                addMessage('bot', '🔍 Web search ENABLED. I can now search the internet for local information like weather, restaurants, and attractions.');
-            } else {
-                toggle.classList.remove('active');
-                addMessage('bot', '🔍 Web search DISABLED. I will only answer from hotel FAQ.');
-            }
-            
-            await fetch('/api/toggle-search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: webSearchEnabled })
-            });
-        }
-        
-        function addCustomRule() {
-            const rule = document.getElementById('newCustomRule').value.trim();
-            if (rule) {
-                customRulesList.push(rule);
-                document.getElementById('newCustomRule').value = '';
-                updateCustomRulesDisplay();
-            }
-        }
-        
-        function removeCustomRule(index) {
-            customRulesList.splice(index, 1);
-            updateCustomRulesDisplay();
-        }
-        
-        function updateCustomRulesDisplay() {
-            const container = document.getElementById('customRulesList');
-            if (customRulesList.length === 0) {
-                container.innerHTML = '<div style="color:#999; padding: 10px;">No custom rules yet.</div>';
-                return;
-            }
-            container.innerHTML = customRulesList.map((rule, i) => `
-                <div style="background:#f8f9fa; padding:8px; margin:5px 0; border-radius:5px; display:flex; justify-content:space-between;">
-                    <span>📌 ${rule}</span>
-                    <button onclick="removeCustomRule(${i})" style="background:#dc3545; color:white; border:none; padding:2px 8px; border-radius:3px; width:auto;">×</button>
-                </div>
-            `).join('');
-        }
-        
-        function displayActiveRules() {
-            const personality = document.getElementById('livePersonality').value || '(not set)';
-            const safety = document.getElementById('liveSafety').value || '(not set)';
-            const style = document.getElementById('liveStyle').value || '(not set)';
-            document.getElementById('activeRulesDisplay').innerHTML = `
-                <div class="rule-badge">🧠 ${personality.substring(0, 50)}</div>
-                <div class="rule-badge">🛡️ ${safety.substring(0, 50)}</div>
-                <div class="rule-badge">🎨 ${style.substring(0, 50)}</div>
-                <div class="rule-badge">🔍 Web Search: ${webSearchEnabled ? 'ON' : 'OFF'}</div>
-                ${customRulesList.map(r => `<div class="rule-badge">⚡ ${r}</div>`).join('')}
-            `;
         }
         
         async function loadCurrentRules() {
@@ -321,28 +305,12 @@
                 document.getElementById('livePersonality').value = rules.personality;
                 document.getElementById('liveSafety').value = rules.safetyRules;
                 document.getElementById('liveStyle').value = rules.styleRules;
-                webSearchEnabled = rules.webSearchEnabled !== false;
-                customRulesList = rules.customRules || [];
-                updateCustomRulesDisplay();
-                displayActiveRules();
-                
-                const toggle = document.getElementById('webSearchToggle');
-                if (webSearchEnabled) {
-                    toggle.classList.add('active');
-                } else {
-                    toggle.classList.remove('active');
-                }
-            } catch (error) {
-                console.error('Could not load rules');
-            }
+                webSearchEnabled = rules.webSearchEnabled;
+                updateWebSearchToggle();
+            } catch(e) {}
         }
         
         async function sendMessage() {
-            if (!botReady) {
-                addMessage('bot', 'Please complete setup first using the left panel.');
-                return;
-            }
-            
             const question = document.getElementById('question').value.trim();
             if (!question) return;
             
@@ -356,17 +324,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userMessage: question })
                 });
-                
                 const data = await response.json();
-                
                 const messagesDiv = document.getElementById('messages');
                 messagesDiv.removeChild(messagesDiv.lastChild);
                 addMessage('bot', data.reply || 'No response');
-                
-            } catch (error) {
+            } catch(e) {
                 const messagesDiv = document.getElementById('messages');
                 messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', '❌ Error connecting to server.');
+                addMessage('bot', '❌ Error');
             }
         }
         
@@ -379,7 +344,7 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        setInterval(displayActiveRules, 2000);
+        loadLimits();
         loadCurrentRules();
     </script>
 </body>

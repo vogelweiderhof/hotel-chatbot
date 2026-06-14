@@ -1,7 +1,7 @@
 {
   "name": "hotel-chatbot",
   "version": "1.0.0",
-  "description": "Smart hotel chatbot with FAQ + web search",
+  "description": "Hotel chatbot with FAQ + web search + limits",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

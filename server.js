@@ -17,48 +17,168 @@ app.use((req, res, next) => {
     next();
 });
 
+// ========== LIMITS CONFIGURATION (ADJUSTABLE VIA API) ==========
+let limitsConfig = {
+    maxTokensPerResponse: 200,
+    maxMessagesPerSession: 15,
+    maxQuestionsPerMinute: 10,
+    dailyQuota: 50,
+    topicFilterEnabled: true
+};
+
+// Store usage data
+const usageTracker = new Map();
+
+// Topic filter patterns
+const ALLOWED_TOPICS = {
+    hotel: /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|shuttle|tax|room type|bed|bathroom|amenities/i,
+    local: /weather|restaurant|bar|cafe|attraction|museum|transport|taxi|bus|train|airport|directions|nearby|local|sightseeing|thing to do|wetter|restaurant|sehenswürdigkeiten|essen|trinken/i,
+    booking: /availability|available|book|booking|price|cost|rate|how much|what.*price|buchen|verfügbarkeit|preis/i,
+    help: /help|assist|support|what can you do|how do you work/i
+};
+
+const BLOCKED_TOPICS = {
+    politics: /politics|election|president|government|trump|biden|putin|ukraine|war|military/i,
+    adult: /sex|porn|naked|hookup|escort|adult/i,
+    violence: /violence|violent|fight|kill|murder|weapon|gun|bomb|attack/i
+};
+
+function isQuestionAllowed(question) {
+    if (!limitsConfig.topicFilterEnabled) return { allowed: true, reason: null };
+    
+    const lowerQuestion = question.toLowerCase();
+    
+    for (const [topic, pattern] of Object.entries(BLOCKED_TOPICS)) {
+        if (pattern.test(lowerQuestion)) {
+            return { allowed: false, reason: `I can only answer questions about the hotel, local attractions, and travel.` };
+        }
+    }
+    
+    let isAllowed = false;
+    for (const [topic, pattern] of Object.entries(ALLOWED_TOPICS)) {
+        if (pattern.test(lowerQuestion)) {
+            isAllowed = true;
+            break;
+        }
+    }
+    
+    if (lowerQuestion.length < 5 && !isAllowed) {
+        return { allowed: true, reason: null };
+    }
+    
+    if (!isAllowed) {
+        return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, and attractions." };
+    }
+    
+    return { allowed: true, reason: null };
+}
+
+function checkRateLimit(ip) {
+    const now = Date.now();
+    const userData = usageTracker.get(ip);
+    
+    if (!userData) {
+        usageTracker.set(ip, {
+            minuteCount: 1,
+            minuteReset: now + 60000,
+            dailyCount: 1,
+            dailyReset: now + 86400000,
+            sessionCount: 1
+        });
+        return { allowed: true, message: null };
+    }
+    
+    if (now > userData.minuteReset) {
+        userData.minuteCount = 0;
+        userData.minuteReset = now + 60000;
+    }
+    
+    if (now > userData.dailyReset) {
+        userData.dailyCount = 0;
+        userData.dailyReset = now + 86400000;
+    }
+    
+    if (userData.minuteCount >= limitsConfig.maxQuestionsPerMinute) {
+        return { allowed: false, message: "Too many questions. Please wait a moment." };
+    }
+    
+    if (userData.dailyCount >= limitsConfig.dailyQuota) {
+        return { allowed: false, message: "Daily question limit reached. Please come back tomorrow." };
+    }
+    
+    if (userData.sessionCount >= limitsConfig.maxMessagesPerSession) {
+        return { allowed: false, message: "Conversation limit reached. Please refresh the page." };
+    }
+    
+    userData.minuteCount++;
+    userData.dailyCount++;
+    userData.sessionCount++;
+    usageTracker.set(ip, userData);
+    
+    return { allowed: true, message: null };
+}
+
+// Clean up old usage data
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, data] of usageTracker.entries()) {
+        if (now > data.dailyReset && now > data.minuteReset) {
+            usageTracker.delete(ip);
+        }
+    }
+}, 3600000);
+
+// ========== LIMITS API ENDPOINTS ==========
+app.get('/api/limits', (req, res) => {
+    res.json(limitsConfig);
+});
+
+app.post('/api/limits', (req, res) => {
+    const { maxTokensPerResponse, maxMessagesPerSession, maxQuestionsPerMinute, dailyQuota, topicFilterEnabled } = req.body;
+    
+    if (maxTokensPerResponse !== undefined) limitsConfig.maxTokensPerResponse = maxTokensPerResponse;
+    if (maxMessagesPerSession !== undefined) limitsConfig.maxMessagesPerSession = maxMessagesPerSession;
+    if (maxQuestionsPerMinute !== undefined) limitsConfig.maxQuestionsPerMinute = maxQuestionsPerMinute;
+    if (dailyQuota !== undefined) limitsConfig.dailyQuota = dailyQuota;
+    if (topicFilterEnabled !== undefined) limitsConfig.topicFilterEnabled = topicFilterEnabled;
+    
+    console.log('📊 Limits updated:', limitsConfig);
+    res.json({ success: true, limits: limitsConfig });
+});
+
+app.post('/api/reset-session', (req, res) => {
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const userData = usageTracker.get(clientIp);
+    if (userData) {
+        userData.sessionCount = 0;
+        usageTracker.set(clientIp, userData);
+    }
+    res.json({ success: true });
+});
+
+// ========== BOT CONFIGURATION ==========
 let botConfig = {
-    personality: "You are a friendly hotel front desk agent named Alex.",
+    personality: "You are a friendly hotel front desk agent. ONLY answer questions about the hotel, local attractions, weather, restaurants, and travel.",
     safetyRules: "Never swear. Stay child-friendly. Avoid controversial topics.",
-    styleRules: "Be concise. Answer in 1-2 sentences. Be helpful.",
+    styleRules: "Be EXTREMELY concise. Answer in 1-2 short sentences.",
     websiteContent: "",
     customRules: [],
     bookingLink: "https://direct-book.com/properties/hotelvogelweiderhof",
     webSearchEnabled: true
 };
 
-// Simple language detection function
 function detectLanguage(text) {
-    const langPatterns = {
-        german: /^(german|deutsch|auf deutsch|wie sagt man)/i,
-        germanWords: /[äöüß]/i,
-        spanish: /^(español|spanish|hablas español)/i,
-        french: /^(français|french|parlez-vous français)/i,
-        italian: /^(italiano|italian|parli italiano)/i,
-        dutch: /^(nederlands|dutch|spreek je nederlands)/i
-    };
-    
-    // Check if user explicitly asks for a language
-    if (langPatterns.german.test(text)) return 'german';
-    if (langPatterns.spanish.test(text)) return 'spanish';
-    if (langPatterns.french.test(text)) return 'french';
-    if (langPatterns.italian.test(text)) return 'italian';
-    if (langPatterns.dutch.test(text)) return 'dutch';
-    
-    // Check for German characters (common in German text)
-    if (langPatterns.germanWords.test(text)) return 'german';
-    
-    return 'auto'; // Let AI detect
+    if (/[äöüß]/i.test(text)) return 'german';
+    if (/á|é|í|ó|ú|ñ/i.test(text)) return 'spanish';
+    if (/ê|è|é|à|ç|û|î|ô|ï|ë/i.test(text)) return 'french';
+    if (/à|è|é|ì|ò|ù/i.test(text)) return 'italian';
+    return 'auto';
 }
 
-// Function to load FAQs from text file (runs on every request)
 function loadFAQs() {
     try {
         const faqPath = path.join(__dirname, 'hotel-faqs.txt');
-        if (!fs.existsSync(faqPath)) {
-            console.log('⚠️ hotel-faqs.txt not found');
-            return null;
-        }
+        if (!fs.existsSync(faqPath)) return null;
         
         const content = fs.readFileSync(faqPath, 'utf8');
         const lines = content.split('\n');
@@ -66,7 +186,6 @@ function loadFAQs() {
         
         for (const line of lines) {
             if (line.trim().startsWith('#') || line.trim() === '') continue;
-            
             const pipeIndex = line.indexOf('|');
             if (pipeIndex > 0) {
                 const question = line.substring(0, pipeIndex).trim().toLowerCase();
@@ -75,17 +194,12 @@ function loadFAQs() {
             }
         }
         
-        console.log(`✅ Loaded ${Object.keys(faqMap).length} FAQ entries`);
-        
-        let faqText = "=== OFFICIAL HOTEL INFORMATION (PRIORITY) ===\n\n";
+        let faqText = "HOTEL INFO:\n";
         for (const [q, a] of Object.entries(faqMap)) {
-            faqText += `• ${q.toUpperCase()}: ${a}\n`;
+            faqText += `${q}: ${a}\n`;
         }
-        
         return { faqMap, faqText };
-        
     } catch (error) {
-        console.error('Error loading FAQs:', error.message);
         return null;
     }
 }
@@ -93,32 +207,22 @@ function loadFAQs() {
 // Setup endpoint
 app.post('/api/setup', async (req, res) => {
     const { websiteUrl, personality, safetyRules, styleRules } = req.body;
-    
     if (personality) botConfig.personality = personality;
     if (safetyRules) botConfig.safetyRules = safetyRules;
     if (styleRules) botConfig.styleRules = styleRules;
     
     if (websiteUrl && websiteUrl !== '') {
         try {
-            console.log(`📖 Reading: ${websiteUrl}`);
-            const response = await axios.get(websiteUrl, { 
-                timeout: 10000,
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
+            const response = await axios.get(websiteUrl, { timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' } });
             const $ = cheerio.load(response.data);
-            const text = $('body').text().replace(/\s+/g, ' ').trim();
-            botConfig.websiteContent = text.substring(0, 2000);
-            console.log(`✅ Loaded ${botConfig.websiteContent.length} chars from website`);
+            botConfig.websiteContent = $('body').text().replace(/\s+/g, ' ').trim().substring(0, 2000);
         } catch (error) {
-            console.log('⚠️ Website scrape failed, but FAQ will still work');
             botConfig.websiteContent = "";
         }
     }
-    
-    res.json({ success: true, message: "Setup complete! Bot can answer in multiple languages." });
+    res.json({ success: true, message: "Setup complete!" });
 });
 
-// Update rules
 app.post('/api/update-rules', (req, res) => {
     const { personality, safetyRules, styleRules, customRules, webSearchEnabled } = req.body;
     if (personality !== undefined) botConfig.personality = personality;
@@ -140,133 +244,88 @@ app.get('/api/get-rules', (req, res) => {
     });
 });
 
-// MAIN CHAT ENDPOINT - Multi-lingual
+// Main chat endpoint
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const userQuestion = req.body.userMessage;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     
     if (!apiKey) {
-        return res.json({ reply: "❌ API key missing. Check your .env file." });
+        return res.json({ reply: "❌ API key missing." });
     }
     
-    // Load FAQs
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+        return res.json({ reply: rateCheck.message });
+    }
+    
+    const topicCheck = isQuestionAllowed(userQuestion);
+    if (!topicCheck.allowed) {
+        return res.json({ reply: topicCheck.reason });
+    }
+    
     const faqData = loadFAQs();
-    const faqText = faqData ? faqData.faqText : "No FAQ file loaded.";
-    
-    // Detect language
+    const faqText = faqData ? faqData.faqText : "";
     const detectedLang = detectLanguage(userQuestion);
-    let languageInstruction = "";
     
-    switch(detectedLang) {
-        case 'german':
-            languageInstruction = "IMPORTANT: The user is writing in GERMAN. You MUST respond in GERMAN (Deutsch). Use 'Sie' form (formal) unless guest uses 'du'.";
-            break;
-        case 'spanish':
-            languageInstruction = "IMPORTANT: The user is writing in SPANISH. You MUST respond in SPANISH (Español). Use 'usted' form.";
-            break;
-        case 'french':
-            languageInstruction = "IMPORTANT: The user is writing in FRENCH. You MUST respond in FRENCH (Français). Use 'vous' form.";
-            break;
-        case 'italian':
-            languageInstruction = "IMPORTANT: The user is writing in ITALIAN. You MUST respond in ITALIAN (Italiano). Use 'lei' form.";
-            break;
-        case 'dutch':
-            languageInstruction = "IMPORTANT: The user is writing in DUTCH. You MUST respond in DUTCH (Nederlands). Use 'u' form.";
-            break;
-        default:
-            languageInstruction = "IMPORTANT: Respond in the SAME LANGUAGE as the user's question. If user writes in German, answer in German. If Spanish, answer in Spanish. If English, answer in English. Match their language exactly.";
-            break;
-    }
+    let languageInstruction = "IMPORTANT: Respond in the SAME LANGUAGE as the user. Be EXTREMELY concise.";
     
-    // Detect question types
-    const isBookingQuestion = /availability|available|book|booking|price|cost|rate|check in|check out|room for|dates?|how much|what.*price|buchen|verfügbarkeit|preis/i.test(userQuestion);
-    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|transport|taxi|bus|train|airport|directions|nearby|around here|local|sightseeing|thing to do|wetter|restaurant|sehenswürdigkeiten/i.test(userQuestion);
+    const isBookingQuestion = /availability|available|book|booking|price|cost|rate|buchen|verfügbarkeit|preis/i.test(userQuestion);
+    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|wetter|restaurant|sehenswürdigkeiten/i.test(userQuestion);
     
-    // Build search instructions
-    let searchInstructions = "";
-    if (botConfig.webSearchEnabled && isLocalInfoQuestion) {
-        searchInstructions = `
-You HAVE the ability to search the web. For questions about LOCAL INFO (weather, restaurants, attractions, transport), you MUST search the web to provide current information.
-`;
-    }
-    
-    const systemPrompt = `You are a helpful hotel chatbot for Hotel Vogelweiderhof.
+    const systemPrompt = `You are a hotel assistant. STRICT RULES:
 
-PERSONALITY: ${botConfig.personality}
-SAFETY RULES: ${botConfig.safetyRules}
-STYLE RULES: ${botConfig.styleRules}
-
-${languageInstruction}
+- ONLY answer hotel, local info, or booking questions
+- ${botConfig.styleRules}
+- ${botConfig.safetyRules}
+- ${languageInstruction}
+- MAXIMUM 2 SENTENCES.
 
 ${faqText}
 
-WEBSITE INFO (limited): ${botConfig.websiteContent || "No website content"}
+${isBookingQuestion ? `For booking: ${botConfig.bookingLink}` : ''}
+${isLocalInfoQuestion && botConfig.webSearchEnabled ? `Use web search for current info.` : ''}
 
-${searchInstructions}
-
-SPECIAL RULES:
-1. For BOOKING/AVAILABILITY questions → Respond with the booking link: ${botConfig.bookingLink}
-2. For HOTEL POLICY questions → Answer ONLY from the FAQ above
-3. For LOCAL INFO questions → Use web search to find current information
-4. MATCH THE USER'S LANGUAGE in your response
-
-GUEST QUESTION: ${userQuestion}
-
-Provide a helpful, concise answer in the SAME LANGUAGE as the question.`;
+GUEST: ${userQuestion}`;
 
     try {
         const apiRequest = {
             model: "deepseek-chat",
-            messages: [
-                { 
-                    role: "system", 
-                    content: "You are a multi-lingual hotel concierge. You can answer in German, English, Spanish, French, Italian, and Dutch. Always respond in the same language the guest uses." 
-                },
-                { role: "user", content: systemPrompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 500
+            messages: [{ role: "user", content: systemPrompt }],
+            temperature: 0.5,
+            max_tokens: limitsConfig.maxTokensPerResponse
         };
         
         if (botConfig.webSearchEnabled && isLocalInfoQuestion) {
             apiRequest.search_enabled = true;
-            console.log('🔍 Web search enabled');
         }
         
         const response = await axios.post('https://api.deepseek.com/v1/chat/completions', apiRequest, {
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 45000
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            timeout: 30000
         });
         
         let reply = response.data.choices[0].message.content;
         
         if (isBookingQuestion && !reply.includes('direct-book.com')) {
-            reply += `\n\n🔗 ${detectedLang === 'german' ? 'Hier buchen:' : 'Book here:'} ${botConfig.bookingLink}`;
+            reply += `\n🔗 ${botConfig.bookingLink}`;
         }
         
         res.json({ reply: reply });
         
     } catch (error) {
         console.error('Chat error:', error.message);
-        res.json({ reply: "I'm having trouble right now. Please try again. / Entschuldigung, bitte versuchen Sie es später erneut." });
+        res.json({ reply: "Sorry, please try again." });
     }
 });
 
 app.post('/api/toggle-search', (req, res) => {
-    const { enabled } = req.body;
-    botConfig.webSearchEnabled = enabled;
-    console.log(`🔍 Web search ${enabled ? 'enabled' : 'disabled'}`);
-    res.json({ success: true, webSearchEnabled: botConfig.webSearchEnabled });
+    botConfig.webSearchEnabled = req.body.enabled;
+    res.json({ success: true });
 });
 
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`\n✅ MULTI-LINGUAL Hotel Chat Bot running at http://localhost:${PORT}`);
-    console.log(`🔑 API Key: ${process.env.DEEPSEEK_API_KEY ? '✅ Set' : '❌ Missing'}`);
-    console.log(`📝 FAQ file: ${fs.existsSync(path.join(__dirname, 'hotel-faqs.txt')) ? '✅ Found' : '❌ Not found'}`);
-    console.log(`🔍 Web Search: ${botConfig.webSearchEnabled ? '✅ Enabled' : '❌ Disabled'}`);
-    console.log(`🌍 Languages: German, English, Spanish, French, Italian, Dutch (auto-detects)\n`);
+    console.log(`\n✅ Hotel Chat Bot running at http://localhost:${PORT}`);
+    console.log(`📊 Current limits: ${limitsConfig.maxMessagesPerSession} msgs/session, ${limitsConfig.dailyQuota}/day\n`);
 });
