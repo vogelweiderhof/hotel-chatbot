@@ -1,509 +1,258 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Hotel AI Assistant - Admin Control Panel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-        
-        h1 { text-align: center; margin-bottom: 20px; color: #333; }
-        
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-        }
-        
-        .panel {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .panel h2 {
-            font-size: 1.3rem;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #0066cc;
-            color: #0066cc;
-        }
-        
-        .panel h3 {
-            font-size: 1rem;
-            margin: 15px 0 10px 0;
-            color: #555;
-        }
-        
-        label {
-            display: block;
-            font-weight: bold;
-            margin-top: 12px;
-            margin-bottom: 4px;
-            font-size: 13px;
-        }
-        
-        input, textarea, select {
-            width: 100%;
-            padding: 8px 10px;
-            margin-bottom: 8px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-        
-        textarea {
-            resize: vertical;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        
-        button {
-            background: #0066cc;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-top: 10px;
-            width: 100%;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        
-        button:hover { background: #0052a3; }
-        button.success { background: #28a745; }
-        button.success:hover { background: #218838; }
-        
-        .status {
-            margin-top: 12px;
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 12px;
-        }
-        .success-bg { background: #d4edda; color: #155724; }
-        .error-bg { background: #f8d7da; color: #721c24; }
-        .info-bg { background: #d1ecf1; color: #0c5460; }
-        
-        .limit-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 12px 0;
-        }
-        .limit-row label {
-            flex: 1;
-            margin: 0;
-            font-size: 13px;
-        }
-        .limit-row input {
-            flex: 1;
-            margin: 0;
-            width: auto;
-        }
-        .limit-row span {
-            width: 60px;
-            font-size: 12px;
-            color: #666;
-        }
-        
-        .toggle-switch {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #f8f9fa;
-            padding: 10px 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-        }
-        .toggle-label { font-weight: bold; font-size: 13px; }
-        .toggle-button {
-            width: 50px;
-            height: 24px;
-            background: #ccc;
-            border-radius: 24px;
-            cursor: pointer;
-            position: relative;
-            transition: 0.3s;
-        }
-        .toggle-button.active { background: #28a745; }
-        .toggle-button::after {
-            content: '';
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 3px;
-            transition: 0.3s;
-        }
-        .toggle-button.active::after { left: 27px; }
-        
-        .messages {
-            height: 350px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            background: #f9f9f9;
-        }
-        .user-msg {
-            text-align: right;
-            margin: 8px;
-            padding: 8px 12px;
-            background: #0066cc;
-            color: white;
-            border-radius: 12px;
-            display: inline-block;
-            float: right;
-            clear: both;
-            max-width: 80%;
-            font-size: 13px;
-        }
-        .bot-msg {
-            text-align: left;
-            margin: 8px;
-            padding: 8px 12px;
-            background: #e9ecef;
-            color: black;
-            border-radius: 12px;
-            display: inline-block;
-            float: left;
-            clear: both;
-            max-width: 80%;
-            font-size: 13px;
-        }
-        
-        .current-values {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        hr { margin: 15px 0; }
-        
-        @media (max-width: 1200px) {
-            .container { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 700px) {
-            .container { grid-template-columns: 1fr; }
-        }
-        
-        .rule-preview {
-            background: #e8f4fd;
-            padding: 8px;
-            border-radius: 6px;
-            margin-top: 8px;
-            font-size: 11px;
-            color: #0066cc;
-        }
-    </style>
-</head>
-<body>
-    <h1>🏨 Hotel Vogelweiderhof - AI Assistant Admin</h1>
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
+
+// CORS headers
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
+
+// ========== DEFAULT RULES ==========
+let botConfig = {
+    personality: `You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.`,
     
-    <div class="container">
-        <!-- PANEL 1: INITIAL SETUP (with your rules as defaults) -->
-        <div class="panel">
-            <h2>📥 1. Initial Setup</h2>
-            <label>Hotel Website URL (optional):</label>
-            <input type="text" id="websiteUrl" placeholder="https://your-hotel.com">
-            
-            <label>Bot Personality:</label>
-            <textarea id="personality" rows="4">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
-            
-            <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="6">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
-            
-            <label>Style Rules:</label>
-            <textarea id="styleRules" rows="6">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
-            
-            <button onclick="setupBot()">📥 Load Setup (with these rules)</button>
-            <div id="status" class="status"></div>
-            <div class="rule-preview">✨ Your custom rules will be saved and used by the bot</div>
-        </div>
-        
-        <!-- PANEL 2: LIVE RULES EDITOR -->
-        <div class="panel">
-            <h2>⚙️ 2. Edit Rules (Live)</h2>
-            <label>Personality:</label>
-            <textarea id="livePersonality" rows="4"></textarea>
-            
-            <label>Safety Rules:</label>
-            <textarea id="liveSafety" rows="5"></textarea>
-            
-            <label>Style Rules:</label>
-            <textarea id="liveStyle" rows="5"></textarea>
-            
-            <div class="toggle-switch">
-                <span class="toggle-label">🔍 Web Search (local info)</span>
-                <div id="webSearchToggle" class="toggle-button" onclick="toggleWebSearch()"></div>
-            </div>
-            
-            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules Now</button>
-        </div>
-        
-        <!-- PANEL 3: LIMITS CONTROL -->
-        <div class="panel">
-            <h2>🛡️ 3. Limits Control</h2>
-            
-            <div class="limit-row">
-                <label>Max tokens per response:</label>
-                <input type="number" id="maxTokens" min="50" max="500" step="10" value="200">
-                <span>tokens</span>
-            </div>
-            
-            <div class="limit-row">
-                <label>Max messages per session:</label>
-                <input type="number" id="maxSession" min="5" max="50" step="1" value="15">
-                <span>messages</span>
-            </div>
-            
-            <div class="limit-row">
-                <label>Max questions per minute:</label>
-                <input type="number" id="maxPerMinute" min="5" max="30" step="1" value="10">
-                <span>/minute</span>
-            </div>
-            
-            <div class="limit-row">
-                <label>Daily quota per user:</label>
-                <input type="number" id="dailyQuota" min="20" max="200" step="10" value="50">
-                <span>questions/day</span>
-            </div>
-            
-            <div class="toggle-switch">
-                <span class="toggle-label">🚫 Topic Filter (block off-topic)</span>
-                <div id="topicFilterToggle" class="toggle-button" onclick="toggleTopicFilter()"></div>
-            </div>
-            
-            <button onclick="saveLimits()" class="success">💾 Save Limits</button>
-            <button onclick="loadLimits()">🔄 Refresh Limits</button>
-            
-            <div class="current-values" id="limitsDisplay">
-                <strong>Current Limits:</strong><br>
-                Loading...
-            </div>
-        </div>
-        
-        <!-- PANEL 4: TEST CHAT -->
-        <div class="panel">
-            <h2>💬 4. Test Chat</h2>
-            <div class="messages" id="messages">
-                <div class="bot-msg">👋 Welcome to Hotel Vogelweiderhof! I'm your AI assistant. I can help with check-in/out times, WiFi, breakfast, local attractions, and more. How may I assist you today?</div>
-            </div>
-            <input type="text" id="question" placeholder="Type a test question..." onkeypress="if(event.key==='Enter') sendMessage()">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-    </div>
+    safetyRules: `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.`,
     
-    <script>
-        // Global variables
-        let botReady = false;
-        let webSearchEnabled = true;
-        let topicFilterEnabled = true;
-        
-        // ========== LIMITS FUNCTIONS ==========
-        
-        async function loadLimits() {
-            try {
-                const response = await fetch('/api/limits');
-                const limits = await response.json();
-                document.getElementById('maxTokens').value = limits.maxTokensPerResponse;
-                document.getElementById('maxSession').value = limits.maxMessagesPerSession;
-                document.getElementById('maxPerMinute').value = limits.maxQuestionsPerMinute;
-                document.getElementById('dailyQuota').value = limits.dailyQuota;
-                topicFilterEnabled = limits.topicFilterEnabled;
-                updateTopicFilterToggle();
-                displayLimits();
-            } catch(e) { 
-                console.error('Failed to load limits', e);
+    styleRules: `Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.`,
+    
+    websiteContent: "",
+    customRules: [],
+    bookingLink: "https://direct-book.com/properties/hotelvogelweiderhof",
+    webSearchEnabled: true
+};
+
+// ========== LIMITS CONFIGURATION ==========
+let limitsConfig = {
+    maxTokensPerResponse: 200,
+    maxMessagesPerSession: 15,
+    maxQuestionsPerMinute: 10,
+    dailyQuota: 50,
+    topicFilterEnabled: true
+};
+
+const usageTracker = new Map();
+
+// Topic filter patterns
+const ALLOWED_TOPICS = {
+    hotel: /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|shuttle|tax|room type|bed|bathroom|amenities/i,
+    local: /weather|restaurant|bar|cafe|attraction|museum|transport|taxi|bus|train|airport|directions|nearby|local|sightseeing|thing to do|wetter|restaurant|sehenswürdigkeiten|essen|trinken/i,
+    booking: /availability|available|book|booking|price|cost|rate|how much|what.*price|buchen|verfügbarkeit|preis/i,
+    help: /help|assist|support|what can you do|how do you work/i
+};
+
+const BLOCKED_TOPICS = {
+    politics: /politics|election|president|government|trump|biden|putin|ukraine|war|military/i,
+    adult: /sex|porn|naked|hookup|escort|adult/i,
+    violence: /violence|violent|fight|kill|murder|weapon|gun|bomb|attack/i
+};
+
+function isQuestionAllowed(question) {
+    if (!limitsConfig.topicFilterEnabled) return { allowed: true, reason: null };
+    const lowerQuestion = question.toLowerCase();
+    for (const [topic, pattern] of Object.entries(BLOCKED_TOPICS)) {
+        if (pattern.test(lowerQuestion)) {
+            return { allowed: false, reason: `I can only answer questions about the hotel, local attractions, and travel.` };
+        }
+    }
+    let isAllowed = false;
+    for (const [topic, pattern] of Object.entries(ALLOWED_TOPICS)) {
+        if (pattern.test(lowerQuestion)) {
+            isAllowed = true;
+            break;
+        }
+    }
+    if (lowerQuestion.length < 5 && !isAllowed) return { allowed: true, reason: null };
+    if (!isAllowed) return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, and attractions." };
+    return { allowed: true, reason: null };
+}
+
+function checkRateLimit(ip) {
+    const now = Date.now();
+    const userData = usageTracker.get(ip);
+    if (!userData) {
+        usageTracker.set(ip, { minuteCount: 1, minuteReset: now + 60000, dailyCount: 1, dailyReset: now + 86400000, sessionCount: 1 });
+        return { allowed: true, message: null };
+    }
+    if (now > userData.minuteReset) { userData.minuteCount = 0; userData.minuteReset = now + 60000; }
+    if (now > userData.dailyReset) { userData.dailyCount = 0; userData.dailyReset = now + 86400000; }
+    if (userData.minuteCount >= limitsConfig.maxQuestionsPerMinute) return { allowed: false, message: "Too many questions. Please wait a moment." };
+    if (userData.dailyCount >= limitsConfig.dailyQuota) return { allowed: false, message: "Daily question limit reached. Please come back tomorrow." };
+    if (userData.sessionCount >= limitsConfig.maxMessagesPerSession) return { allowed: false, message: "Conversation limit reached. Please refresh the page." };
+    userData.minuteCount++; userData.dailyCount++; userData.sessionCount++;
+    usageTracker.set(ip, userData);
+    return { allowed: true, message: null };
+}
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, data] of usageTracker.entries()) {
+        if (now > data.dailyReset && now > data.minuteReset) usageTracker.delete(ip);
+    }
+}, 3600000);
+
+// ========== API ENDPOINTS ==========
+app.get('/api/limits', (req, res) => { res.json(limitsConfig); });
+
+app.post('/api/limits', (req, res) => {
+    const { maxTokensPerResponse, maxMessagesPerSession, maxQuestionsPerMinute, dailyQuota, topicFilterEnabled } = req.body;
+    if (maxTokensPerResponse !== undefined) limitsConfig.maxTokensPerResponse = maxTokensPerResponse;
+    if (maxMessagesPerSession !== undefined) limitsConfig.maxMessagesPerSession = maxMessagesPerSession;
+    if (maxQuestionsPerMinute !== undefined) limitsConfig.maxQuestionsPerMinute = maxQuestionsPerMinute;
+    if (dailyQuota !== undefined) limitsConfig.dailyQuota = dailyQuota;
+    if (topicFilterEnabled !== undefined) limitsConfig.topicFilterEnabled = topicFilterEnabled;
+    res.json({ success: true, limits: limitsConfig });
+});
+
+app.post('/api/reset-session', (req, res) => {
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const userData = usageTracker.get(clientIp);
+    if (userData) userData.sessionCount = 0;
+    res.json({ success: true });
+});
+
+function detectLanguage(text) {
+    if (/[äöüß]/i.test(text)) return 'german';
+    if (/á|é|í|ó|ú|ñ/i.test(text)) return 'spanish';
+    if (/ê|è|é|à|ç|û|î|ô|ï|ë/i.test(text)) return 'french';
+    if (/à|è|é|ì|ò|ù/i.test(text)) return 'italian';
+    return 'auto';
+}
+
+function loadFAQs() {
+    try {
+        const faqPath = path.join(__dirname, 'hotel-faqs.txt');
+        if (!fs.existsSync(faqPath)) return null;
+        const content = fs.readFileSync(faqPath, 'utf8');
+        const lines = content.split('\n');
+        const faqMap = {};
+        for (const line of lines) {
+            if (line.trim().startsWith('#') || line.trim() === '') continue;
+            const pipeIndex = line.indexOf('|');
+            if (pipeIndex > 0) {
+                const question = line.substring(0, pipeIndex).trim().toLowerCase();
+                const answer = line.substring(pipeIndex + 1).trim();
+                faqMap[question] = answer;
             }
         }
+        let faqText = "HOTEL INFO:\n";
+        for (const [q, a] of Object.entries(faqMap)) faqText += `${q}: ${a}\n`;
+        return { faqMap, faqText };
+    } catch (error) { return null; }
+}
+
+app.post('/api/setup', async (req, res) => {
+    const { websiteUrl, personality, safetyRules, styleRules } = req.body;
+    if (personality) botConfig.personality = personality;
+    if (safetyRules) botConfig.safetyRules = safetyRules;
+    if (styleRules) botConfig.styleRules = styleRules;
+    if (websiteUrl && websiteUrl !== '') {
+        try {
+            const response = await axios.get(websiteUrl, { timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const $ = cheerio.load(response.data);
+            botConfig.websiteContent = $('body').text().replace(/\s+/g, ' ').trim().substring(0, 2000);
+        } catch (error) { botConfig.websiteContent = ""; }
+    }
+    res.json({ success: true, message: "Setup complete!" });
+});
+
+app.post('/api/update-rules', (req, res) => {
+    const { personality, safetyRules, styleRules, customRules, webSearchEnabled } = req.body;
+    if (personality !== undefined) botConfig.personality = personality;
+    if (safetyRules !== undefined) botConfig.safetyRules = safetyRules;
+    if (styleRules !== undefined) botConfig.styleRules = styleRules;
+    if (customRules !== undefined) botConfig.customRules = customRules;
+    if (webSearchEnabled !== undefined) botConfig.webSearchEnabled = webSearchEnabled;
+    res.json({ success: true });
+});
+
+app.get('/api/get-rules', (req, res) => {
+    res.json({
+        personality: botConfig.personality,
+        safetyRules: botConfig.safetyRules,
+        styleRules: botConfig.styleRules,
+        customRules: botConfig.customRules,
+        bookingLink: botConfig.bookingLink,
+        webSearchEnabled: botConfig.webSearchEnabled
+    });
+});
+
+app.post('/api/toggle-search', (req, res) => {
+    botConfig.webSearchEnabled = req.body.enabled;
+    res.json({ success: true });
+});
+
+app.post('/api/chat', async (req, res) => {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    const userQuestion = req.body.userMessage;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    
+    if (!apiKey) return res.json({ reply: "❌ API key missing." });
+    
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) return res.json({ reply: rateCheck.message });
+    
+    const topicCheck = isQuestionAllowed(userQuestion);
+    if (!topicCheck.allowed) return res.json({ reply: topicCheck.reason });
+    
+    const faqData = loadFAQs();
+    const faqText = faqData ? faqData.faqText : "";
+    const detectedLang = detectLanguage(userQuestion);
+    const isBookingQuestion = /availability|available|book|booking|price|cost|rate|buchen|verfügbarkeit|preis/i.test(userQuestion);
+    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|wetter|restaurant|sehenswürdigkeiten/i.test(userQuestion);
+    
+    const systemPrompt = `You are a hotel assistant. Follow these rules STRICTLY:
+
+PERSONALITY: ${botConfig.personality}
+
+SAFETY RULES: ${botConfig.safetyRules}
+
+STYLE RULES: ${botConfig.styleRules}
+
+LANGUAGE: Respond in the SAME language as the guest.
+
+HOTEL INFO: ${faqText || "No FAQ loaded"}
+
+${isBookingQuestion ? `For booking: ${botConfig.bookingLink}` : ''}
+${isLocalInfoQuestion && botConfig.webSearchEnabled ? `Use web search for current local information.` : ''}
+
+GUEST: ${userQuestion}`;
+
+    try {
+        const apiRequest = {
+            model: "deepseek-chat",
+            messages: [{ role: "user", content: systemPrompt }],
+            temperature: 0.5,
+            max_tokens: limitsConfig.maxTokensPerResponse
+        };
+        if (botConfig.webSearchEnabled && isLocalInfoQuestion) apiRequest.search_enabled = true;
         
-        async function saveLimits() {
-            const limits = {
-                maxTokensPerResponse: parseInt(document.getElementById('maxTokens').value),
-                maxMessagesPerSession: parseInt(document.getElementById('maxSession').value),
-                maxQuestionsPerMinute: parseInt(document.getElementById('maxPerMinute').value),
-                dailyQuota: parseInt(document.getElementById('dailyQuota').value),
-                topicFilterEnabled: topicFilterEnabled
-            };
-            
-            try {
-                const response = await fetch('/api/limits', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(limits)
-                });
-                const data = await response.json();
-                if (data.success) {
-                    addMessage('bot', '✅ Limits saved successfully!');
-                    displayLimits();
-                } else {
-                    addMessage('bot', '❌ Failed to save limits');
-                }
-            } catch(e) { 
-                addMessage('bot', '❌ Error saving limits');
-            }
-        }
+        const response = await axios.post('https://api.deepseek.com/v1/chat/completions', apiRequest, {
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            timeout: 30000
+        });
         
-        function displayLimits() {
-            const tokens = document.getElementById('maxTokens').value;
-            const session = document.getElementById('maxSession').value;
-            const minute = document.getElementById('maxPerMinute').value;
-            const daily = document.getElementById('dailyQuota').value;
-            document.getElementById('limitsDisplay').innerHTML = `
-                <strong>Current Limits:</strong><br>
-                • Tokens/response: ${tokens}<br>
-                • Messages/session: ${session}<br>
-                • Questions/minute: ${minute}<br>
-                • Daily quota: ${daily}<br>
-                • Topic Filter: ${topicFilterEnabled ? '✅ ON' : '❌ OFF'}
-            `;
-        }
-        
-        function updateTopicFilterToggle() {
-            const toggle = document.getElementById('topicFilterToggle');
-            if (topicFilterEnabled) toggle.classList.add('active');
-            else toggle.classList.remove('active');
-        }
-        
-        function toggleTopicFilter() {
-            topicFilterEnabled = !topicFilterEnabled;
-            updateTopicFilterToggle();
-            displayLimits();
-            addMessage('bot', `🚫 Topic filter ${topicFilterEnabled ? 'enabled' : 'disabled'}`);
-        }
-        
-        // ========== WEB SEARCH TOGGLE ==========
-        
-        function updateWebSearchToggle() {
-            const toggle = document.getElementById('webSearchToggle');
-            if (webSearchEnabled) toggle.classList.add('active');
-            else toggle.classList.remove('active');
-        }
-        
-        async function toggleWebSearch() {
-            webSearchEnabled = !webSearchEnabled;
-            updateWebSearchToggle();
-            await fetch('/api/toggle-search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: webSearchEnabled })
-            });
-            addMessage('bot', `🔍 Web search ${webSearchEnabled ? 'enabled' : 'disabled'}`);
-        }
-        
-        // ========== SETUP FUNCTIONS ==========
-        
-        async function setupBot() {
-            const websiteUrl = document.getElementById('websiteUrl').value;
-            const personality = document.getElementById('personality').value;
-            const safetyRules = document.getElementById('safetyRules').value;
-            const styleRules = document.getElementById('styleRules').value;
-            const statusDiv = document.getElementById('status');
-            
-            statusDiv.innerHTML = '<div class="info-bg">⏳ Setting up...</div>';
-            
-            try {
-                const response = await fetch('/api/setup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ websiteUrl, personality, safetyRules, styleRules })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    botReady = true;
-                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready with your custom rules!</div>';
-                    document.getElementById('livePersonality').value = personality;
-                    document.getElementById('liveSafety').value = safetyRules;
-                    document.getElementById('liveStyle').value = styleRules;
-                    addMessage('bot', 'Setup complete! I am now following your custom personality, safety, and style rules.');
-                    loadCurrentRules();
-                } else {
-                    statusDiv.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
-                }
-            } catch(e) { 
-                statusDiv.innerHTML = '<div class="error-bg">❌ Connection error</div>';
-            }
-        }
-        
-        async function updateRulesOnly() {
-            const personality = document.getElementById('livePersonality').value;
-            const safetyRules = document.getElementById('liveSafety').value;
-            const styleRules = document.getElementById('liveStyle').value;
-            
-            await fetch('/api/update-rules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ personality, safetyRules, styleRules, webSearchEnabled })
-            });
-            addMessage('bot', '✨ Rules updated! I will now follow your new instructions.');
-            loadCurrentRules();
-        }
-        
-        async function loadCurrentRules() {
-            try {
-                const response = await fetch('/api/get-rules');
-                const rules = await response.json();
-                document.getElementById('livePersonality').value = rules.personality;
-                document.getElementById('liveSafety').value = rules.safetyRules;
-                document.getElementById('liveStyle').value = rules.styleRules;
-                webSearchEnabled = rules.webSearchEnabled;
-                updateWebSearchToggle();
-            } catch(e) {}
-        }
-        
-        // ========== CHAT FUNCTIONS ==========
-        
-        async function sendMessage() {
-            const input = document.getElementById('question');
-            const question = input.value.trim();
-            if (!question) return;
-            
-            addMessage('user', question);
-            input.value = '';
-            addMessage('bot', '🤔 Thinking...');
-            
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userMessage: question })
-                });
-                const data = await response.json();
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', data.reply || 'No response');
-            } catch(e) {
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', '❌ Error connecting to server');
-            }
-        }
-        
-        function addMessage(sender, text) {
-            const messagesDiv = document.getElementById('messages');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = sender === 'user' ? 'user-msg' : 'bot-msg';
-            msgDiv.textContent = text;
-            messagesDiv.appendChild(msgDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
-        
-        // ========== INITIALIZE ==========
-        
-        loadLimits();
-        loadCurrentRules();
-    </script>
-</body>
-</html>
+        let reply = response.data.choices[0].message.content;
+        if (isBookingQuestion && !reply.includes('direct-book.com')) reply += `\n\n🔗 Please check availability here: ${botConfig.bookingLink}`;
+        res.json({ reply: reply });
+    } catch (error) {
+        console.error('Chat error:', error.message);
+        res.json({ reply: "I apologize, but I'm having trouble right now. Please try again in a moment." });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
+    console.log(`📊 Limits: ${limitsConfig.maxMessagesPerSession} msgs/session, ${limitsConfig.dailyQuota}/day`);
+    console.log(`🎭 Rules: Personality + Safety + Style loaded\n`);
+});
