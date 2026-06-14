@@ -5,8 +5,14 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 
-// ÖBB API Integration for Austrian public transport
-const oebb = require('oebb-api');
+// ÖBB API Integration (optional - will work without it)
+let oebb = null;
+try {
+    oebb = require('oebb-api');
+    console.log('✅ ÖBB API loaded');
+} catch (error) {
+    console.log('⚠️ ÖBB API not available - using web search for transport');
+}
 
 const app = express();
 app.use(express.json());
@@ -22,17 +28,15 @@ app.use((req, res, next) => {
 
 // ========== HOTEL LOCATION ==========
 const HOTEL_ADDRESS = "Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg, Austria";
-const HOTEL_STATION = "Salzburg Vogelweiderstraße"; // Nearest bus/tram stop
+const HOTEL_STATION = "Salzburg Vogelweiderstraße";
 
-// Cache for station searches (reduce API calls)
+// Cache for station searches
 const stationCache = new Map();
 
-// ========== ÖBB API FUNCTIONS ==========
+// ========== ÖBB API FUNCTIONS (with null checks) ==========
 async function getStationId(stationName) {
-    if (stationCache.has(stationName)) {
-        return stationCache.get(stationName);
-    }
-    
+    if (!oebb) return null;
+    if (stationCache.has(stationName)) return stationCache.get(stationName);
     try {
         const stations = await oebb.searchStationsNew(stationName);
         if (stations && stations.length > 0) {
@@ -46,15 +50,13 @@ async function getStationId(stationName) {
 }
 
 async function getJourney(fromStation, toStation, addOffers = false) {
+    if (!oebb) return null;
     try {
         const from = await getStationId(fromStation);
         const to = await getStationId(toStation);
-        
         if (!from || !to) return null;
-        
         const date = new Date();
         const journeys = await oebb.getJourneys(from, to, addOffers, date);
-        
         if (journeys && journeys.connections && journeys.connections.length > 0) {
             return journeys.connections[0];
         }
@@ -65,14 +67,13 @@ async function getJourney(fromStation, toStation, addOffers = false) {
 }
 
 async function getDepartures(stationName, minutesAhead = 60) {
+    if (!oebb) return null;
     try {
         const station = await getStationId(stationName);
         if (!station) return null;
-        
         const options = oebb.getStationBoardDataOptions();
         options.evaId = station.number;
         options.maxJourneys = 5;
-        
         const departures = await oebb.getStationBoardData(options);
         return departures;
     } catch (error) {
@@ -82,7 +83,7 @@ async function getDepartures(stationName, minutesAhead = 60) {
 }
 
 function isPublicTransportQuestion(question) {
-    const transportKeywords = /bus|train|tram|sbahn|s-bahn|ubahn|u-bahn|bahn|station|haltestelle|fahrplan|schedule|departure|abfahrt|ankunft|arrival|verbindung|connection|wie komme ich|how to get|öffentliche verkehrsmittel|public transport|oebb|öbb|fahrverbindung/i;
+    const transportKeywords = /bus|train|tram|sbahn|s-bahn|ubahn|u-bahn|bahn|station|haltestelle|fahrplan|schedule|departure|abfahrt|ankunft|arrival|verbindung|connection|wie komme ich|how to get|öffentliche verkehrsmittel|public transport|oebb|öbb/i;
     return transportKeywords.test(question);
 }
 
@@ -176,13 +177,13 @@ setInterval(() => {
     fs.writeFileSync(path.join(__dirname, 'analytics.json'), JSON.stringify(stats, null, 2));
 }, 3600000);
 
-// ========== DEFAULT RULES ==========
+// ========== CONVERSATIONAL BOT RULES ==========
 let botConfig = {
-    personality: `You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question. When giving passwords, codes, or credentials, present them as plain text without any formatting, quotation marks, or asterisks. Just say the password clearly.`,
+    personality: `You are a friendly, warm, and conversational hotel front desk agent. Have a natural, back-and-forth conversation with guests. Be helpful but not robotic. Use casual, friendly language. Smile in your responses. Use phrases like "Of course!", "Happy to help!", "Great question!" occasionally. Keep responses concise but warm. Never be abrupt or short. Acknowledge follow-up questions naturally. If a guest asks for confirmation (like "just internet?"), respond warmly like "That's right! Just 'internet' - nice and simple." Never block or reject a follow-up question. Be conversational and helpful.`,
     
-    safetyRules: `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.`,
+    safetyRules: `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never share other guests' data. If uncertain about an answer, say so honestly. Block abusive language with one neutral warning.`,
     
-    styleRules: `Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. NEVER use bold for passwords, codes, or credentials. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.`,
+    styleRules: `Use natural, conversational language. Be warm and friendly. Use occasional emojis sparingly (😊, 👍, 🏨). Keep responses concise but complete. Never end a conversation abruptly. Always leave the door open for follow-up questions.`,
     
     websiteContent: "",
     customRules: [],
@@ -192,8 +193,8 @@ let botConfig = {
 
 // ========== LIMITS CONFIGURATION ==========
 let limitsConfig = {
-    maxTokensPerResponse: 150,
-    maxMessagesPerSession: 15,
+    maxTokensPerResponse: 200,  // Increased for more conversational responses
+    maxMessagesPerSession: 20,
     maxQuestionsPerMinute: 10,
     dailyQuota: 500,
     topicFilterEnabled: true
@@ -201,15 +202,19 @@ let limitsConfig = {
 
 const usageTracker = new Map();
 
-// ========== TOPIC FILTER (ADDRESS ADDED) ==========
+// ========== EXPANDED TOPIC FILTER (Now allows confirmations) ==========
 const ALLOWED_TOPICS = {
-    hotel: /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|room type|bed|bathroom|amenities|checkin|checkout|address|location|street|where are you|hotel address|directions to hotel|how to get to the hotel/i,
+    hotel: /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|room type|bed|bathroom|amenities|address|location|street|where are you|hotel address/i,
     
-    transport: /how to get|directions|get to|go to|way to|from hotel to|travel to|reach|taxi|bus|train|tram|subway|metro|shuttle|walk|drive|bike|public transport|public transportation|car rental|pick up|drop off|uber|lyft|navigate/i,
+    // Added conversational patterns
+    conversational: /^(just|only|really|so|ok|okay|thanks|thank you|great|perfect|got it|i see|ah|oh|hmm|yes|no|yeah|sure|right|correct|exactly)$/i,
+    confirmation: /(just|only|really)\?$|is that (all|it|correct)|so that's it|that's all|nothing else/i,
     
-    local: /weather|restaurant|bar|cafe|attraction|museum|airport|station|city center|old town|downtown|nearby|local|sightseeing|thing to do|wetter|restaurant|sehenswürdigkeiten|essen|trinken|what to see|what to do|salzburg|vienna|innsbruck|pharmacy|hospital|doctor|apotheke|krankenhaus/i,
+    transport: /how to get|directions|get to|go to|way to|from hotel to|travel to|reach|taxi|bus|train|tram|subway|metro|shuttle|walk|drive|bike|public transport/i,
     
-    booking: /availability|available|book|booking|price|cost|rate|how much|what.*price|buchen|verfügbarkeit|preis/i,
+    local: /weather|restaurant|bar|cafe|attraction|museum|airport|station|city center|old town|downtown|nearby|local|sightseeing|thing to do|salzburg|vienna|what to see|what to do/i,
+    
+    booking: /availability|available|book|booking|price|cost|rate|how much|what.*price/i,
     
     help: /help|assist|support|what can you do|how do you work/i
 };
@@ -231,12 +236,24 @@ function detectCategory(question) {
 function isQuestionAllowed(question) {
     if (!limitsConfig.topicFilterEnabled) return { allowed: true, reason: null };
     const lowerQuestion = question.toLowerCase();
+    
+    // Always allow short confirmations and thanks
+    if (lowerQuestion.match(/^(ok|okay|thanks|thank you|great|perfect|got it|i see|yes|no|yeah|sure|right)$/i)) {
+        return { allowed: true, reason: null };
+    }
+    
+    // Allow confirmation questions like "just internet?"
+    if (lowerQuestion.match(/(just|only|really)\?$/)) {
+        return { allowed: true, reason: null };
+    }
+    
     for (const [topic, pattern] of Object.entries(BLOCKED_TOPICS)) {
         if (pattern.test(lowerQuestion)) {
             analytics.blockedQuestions++;
-            return { allowed: false, reason: `I can only answer questions about the hotel, local attractions, transportation, and travel.` };
+            return { allowed: false, reason: `I'm here to help with hotel and travel questions only.` };
         }
     }
+    
     let isAllowed = false;
     for (const [topic, pattern] of Object.entries(ALLOWED_TOPICS)) {
         if (pattern.test(lowerQuestion)) {
@@ -245,14 +262,16 @@ function isQuestionAllowed(question) {
             break;
         }
     }
+    
     if (lowerQuestion.length < 5 && !isAllowed) {
         analytics.questionsByCategory.help++;
         return { allowed: true, reason: null };
     }
+    
     if (!isAllowed) {
         analytics.questionsByCategory.other++;
         analytics.blockedQuestions++;
-        return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, attractions, directions, and the hotel address." };
+        return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, attractions, directions, and the hotel address. What would you like to know?" };
     }
     return { allowed: true, reason: null };
 }
@@ -263,9 +282,6 @@ function checkRateLimit(ip) {
     if (!userData) {
         userData = { minuteCount: 1, minuteReset: now + 60000, dailyCount: 1, dailyReset: now + 86400000, sessionCount: 1 };
         usageTracker.set(ip, userData);
-        const today = new Date().toDateString();
-        if (!analytics.dailyDates.has(today)) analytics.dailyDates.set(today, 0);
-        analytics.dailyDates.set(today, analytics.dailyDates.get(today) + 1);
         analytics.dailyActiveSessions.add(ip);
         return { allowed: true, message: null };
     }
@@ -278,7 +294,7 @@ function checkRateLimit(ip) {
         return { allowed: false, message: "Daily question limit reached. Please come back tomorrow." };
     }
     if (userData.sessionCount >= limitsConfig.maxMessagesPerSession) {
-        return { allowed: false, message: "Conversation limit reached. Please refresh the page." };
+        return { allowed: false, message: "Conversation limit reached. Please refresh the page to start a new conversation." };
     }
     userData.minuteCount++;
     userData.dailyCount++;
@@ -319,7 +335,7 @@ function loadFAQs() {
                 faqMap[question] = answer;
             }
         }
-        let faqText = "=== OFFICIAL HOTEL INFORMATION ===\n\n";
+        let faqText = "=== HOTEL INFORMATION ===\n\n";
         for (const [q, a] of Object.entries(faqMap)) faqText += `• ${q.toUpperCase()}: ${a}\n`;
         cachedFAQ = { faqMap, faqText, timestamp: stats.mtimeMs };
         lastFAQModified = stats.mtimeMs;
@@ -333,12 +349,6 @@ function detectLanguage(text) {
     analytics.totalQuestions++;
     const normalizedQuestion = text.toLowerCase().replace(/[^\w\s]/g, '').substring(0, 100);
     analytics.mostAskedQuestions.set(normalizedQuestion, (analytics.mostAskedQuestions.get(normalizedQuestion) || 0) + 1);
-    
-    if (/\b(auf deutsch|german|deutsch)\b/i.test(text)) { analytics.questionsByLanguage.german++; return 'german'; }
-    if (/\b(spanish|español)\b/i.test(text)) { analytics.questionsByLanguage.spanish++; return 'spanish'; }
-    if (/\b(french|français)\b/i.test(text)) { analytics.questionsByLanguage.french++; return 'french'; }
-    if (/\b(italian|italiano)\b/i.test(text)) { analytics.questionsByLanguage.italian++; return 'italian'; }
-    if (/\b(chinese|中文)\b/i.test(text)) { analytics.questionsByLanguage.chinese++; return 'chinese'; }
     
     if (/[äöüß]/i.test(text)) { analytics.questionsByLanguage.german++; return 'german'; }
     if (/[\u4e00-\u9fff]/.test(text)) { analytics.questionsByLanguage.chinese++; return 'chinese'; }
@@ -441,7 +451,7 @@ app.post('/api/feedback', (req, res) => {
     res.json({ success: true });
 });
 
-// ========== MAIN CHAT ENDPOINT (with ÖBB Integration) ==========
+// ========== MAIN CHAT ENDPOINT (Conversational) ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const userQuestion = req.body.userMessage;
@@ -467,17 +477,18 @@ app.post('/api/chat', async (req, res) => {
     let history = conversationMemory.get(clientIp) || [];
     const historyText = history.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n');
     
-    const isBookingQuestion = /availability|available|book|booking|price|cost|rate|buchen|verfügbarkeit|preis|how much|what.*price/i.test(userQuestion);
-    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|wetter|restaurant|sehenswürdigkeiten|transport|directions|how to get|taxi|bus|train|old town|city center/i.test(userQuestion);
+    const isBookingQuestion = /availability|available|book|booking|price|cost|rate/i.test(userQuestion);
+    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|transport|directions|how to get|taxi|bus|train|old town|city center/i.test(userQuestion);
     const questionCategory = detectCategory(userQuestion);
     
     if (isLocalInfoQuestion && botConfig.webSearchEnabled) analytics.webSearchUsage++;
     
-    // ========== ÖBB TRANSPORT INTEGRATION ==========
+    // Check if this is a confirmation/follow-up question
+    const isConfirmation = /(just|only|really)\?$|is that (all|it|correct)|so that's it|that's all/i.test(userQuestion);
+    
+    // ÖBB Transport Integration
     let transportInfo = "";
-    if (isPublicTransportQuestion(userQuestion)) {
-        console.log('🚆 Public transport question detected - querying ÖBB API');
-        
+    if (isPublicTransportQuestion(userQuestion) && oebb) {
         const destinations = {
             "old town": "Salzburg Mirabellplatz",
             "altstadt": "Salzburg Mirabellplatz",
@@ -486,11 +497,7 @@ app.post('/api/chat', async (req, res) => {
             "hauptbahnhof": "Salzburg Hauptbahnhof",
             "main station": "Salzburg Hauptbahnhof",
             "airport": "Salzburg Airport",
-            "flughafen": "Salzburg Airport",
-            "hellbrunn": "Salzburg Hellbrunn",
-            "untersberg": "Salzburg Untersbergbahn",
-            "getreidegasse": "Salzburg Getreidegasse",
-            "mozart": "Salzburg Mozartsteg"
+            "flughafen": "Salzburg Airport"
         };
         
         let destination = null;
@@ -503,70 +510,52 @@ app.post('/api/chat', async (req, res) => {
         
         if (destination) {
             const journey = await getJourney(HOTEL_STATION, destination);
-            if (journey) {
+            if (journey && journey.sections && journey.sections[0]) {
+                const section = journey.sections[0];
                 const duration = journey.duration ? Math.round(journey.duration / 60000) : "?";
-                transportInfo = `\n\n🚆 **Real-time public transport from ${HOTEL_STATION} to ${destination}:**\n`;
-                if (journey.sections && journey.sections[0]) {
-                    const section = journey.sections[0];
-                    transportInfo += `• Transport: ${section.category?.name || 'Bus/Train'} ${section.category?.number || ''}\n`;
-                    transportInfo += `• Departure: ${section.from?.departure?.substring(11, 16) || 'now'}\n`;
-                    transportInfo += `• Duration: approx. ${duration} minutes\n`;
-                    if (journey.connection?.switches) {
-                        transportInfo += `• Transfers: ${journey.connection.switches}\n`;
-                    }
-                }
-            }
-        } else {
-            const departures = await getDepartures(HOTEL_STATION, 30);
-            if (departures && departures.journey && departures.journey.length > 0) {
-                transportInfo = `\n\n🚆 **Next departures from ${HOTEL_STATION} (near hotel):**\n`;
-                for (let i = 0; i < Math.min(3, departures.journey.length); i++) {
-                    const journey = departures.journey[i];
-                    const delay = journey.rt?.dlm ? ` (+${journey.rt.dlm} min)` : "";
-                    transportInfo += `• ${journey.pr} to ${journey.st || 'various destinations'} at ${journey.ti}${delay}\n`;
-                }
-                transportInfo += `\nThe nearest stop is a 2-minute walk from Hotel Vogelweiderhof at Vogelweiderstraße 93/B.`;
+                transportInfo = `\n\n🚆 Real-time from ${HOTEL_STATION} to ${destination}: ${section.category?.name || 'Bus'} ${section.category?.number || ''}, departing ${section.from?.departure?.substring(11, 16) || 'soon'}, about ${duration} minutes.`;
             }
         }
     }
     
     const languageInstructions = {
-        english: "RESPOND IN ENGLISH. Be concise and friendly.",
-        german: "ANTWORTE AUF DEUTSCH. Verwenden Sie 'Sie' als Höflichkeitsform.",
-        spanish: "RESPONDE EN ESPAÑOL. Use 'usted' para cortesía.",
-        french: "RÉPONDEZ EN FRANÇAIS. Utilisez 'vous'.",
-        italian: "RISPONDI IN ITALIANO. Usa 'lei'.",
-        chinese: "用中文回复。使用礼貌用语。"
+        english: "RESPOND IN ENGLISH. Be warm, conversational, and friendly.",
+        german: "ANTWORTE AUF DEUTSCH. Seien Sie warmherzig und gesprächig.",
+        chinese: "用中文回复。保持温暖、对话式、友好。"
     };
     
-    const systemPrompt = `You are a hotel assistant at Hotel Vogelweiderhof.
+    const systemPrompt = `You are a warm, conversational hotel assistant at Hotel Vogelweiderhof.
 
 PERSONALITY: ${botConfig.personality}
+
 SAFETY: ${botConfig.safetyRules}
+
 STYLE: ${botConfig.styleRules}
 
 ${languageInstructions[detectedLang] || languageInstructions.english}
 
-${transportInfo ? `**REAL-TIME PUBLIC TRANSPORT INFORMATION (From ÖBB):**${transportInfo}\n\n` : ''}
+${isConfirmation ? "This is a follow-up/confirmation question. Respond warmly and conversationally. For example, if they ask 'just internet?', say 'That's right! Just internet - nice and simple.' Keep it friendly!" : ""}
 
-PREVIOUS CONVERSATION:
+${transportInfo ? `REAL-TIME TRANSPORT:${transportInfo}\n` : ""}
+
+PREVIOUS CONVERSATION for context:
 ${historyText || "None"}
 
-HOTEL INFORMATION (Use this to answer hotel policy questions):
-${faqText}
+HOTEL INFO: ${faqText}
+
+The hotel address is: Vogelweiderstraße 93/B, 5020 Salzburg, Austria.
 
 ${isBookingQuestion ? `Booking link: ${botConfig.bookingLink}` : ''}
-${isLocalInfoQuestion && botConfig.webSearchEnabled ? `Use web search for current info (weather, restaurants, transport, directions).` : ''}
 
-The hotel is located at: Vogelweiderstraße 93/B, 5020 Salzburg, Austria.
+GUEST: ${userQuestion}
 
-GUEST: ${userQuestion}`;
+Be warm, conversational, and helpful. Keep responses friendly but not too long.`;
 
     try {
         const apiRequest = {
             model: "deepseek-chat",
             messages: [{ role: "user", content: systemPrompt }],
-            temperature: 0.3,
+            temperature: 0.7,  // Increased for more natural conversation
             max_tokens: limitsConfig.maxTokensPerResponse
         };
         if (botConfig.webSearchEnabled && isLocalInfoQuestion) apiRequest.search_enabled = true;
@@ -583,8 +572,7 @@ GUEST: ${userQuestion}`;
         }
         
         if (isBookingQuestion && !reply.includes('direct-book.com')) {
-            const bookingText = { english: "Check availability:", german: "Verfügbarkeit prüfen:", spanish: "Ver disponibilidad:", french: "Vérifier disponibilité:", italian: "Verifica disponibilità:", chinese: "查看空房情况：" };
-            reply += `\n\n🔗 ${bookingText[detectedLang] || bookingText.english} ${botConfig.bookingLink}`;
+            reply += `\n\n🔗 ${botConfig.bookingLink}`;
         }
         
         history.push({ role: "user", content: userQuestion.substring(0, 100) });
@@ -595,17 +583,15 @@ GUEST: ${userQuestion}`;
         res.json({ reply: reply });
     } catch (error) {
         console.error('Chat error:', error.message);
-        res.json({ reply: "I apologize, but I'm having trouble right now. Please try again in a moment." });
+        res.json({ reply: "I'm having a little trouble right now. Could you try again? 😊" });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
-    console.log(`📍 Hotel Address: ${HOTEL_ADDRESS}`);
-    console.log(`🚆 Nearest Station: ${HOTEL_STATION}`);
-    console.log(`📊 Analytics: Tracking questions, tokens, and costs`);
-    console.log(`🌍 Languages: EN, DE, ES, FR, IT, ZH`);
-    console.log(`🚍 ÖBB Transport API: ENABLED`);
-    console.log(`🔍 Web search: ${botConfig.webSearchEnabled ? 'ON' : 'OFF'}\n`);
+    console.log(`\n✅ Conversational Hotel Chat Bot running on port ${PORT}`);
+    console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
+    console.log(`💬 Personality: Warm, friendly, conversational`);
+    console.log(`🚍 ÖBB Transport: ${oebb ? 'ENABLED' : 'DISABLED (using web search)'}`);
+    console.log(`🌍 Languages: English, German, Chinese\n`);
 });
