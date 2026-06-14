@@ -24,8 +24,32 @@ let botConfig = {
     websiteContent: "",
     customRules: [],
     bookingLink: "https://direct-book.com/properties/hotelvogelweiderhof",
-    webSearchEnabled: true  // NEW: Enable web search
+    webSearchEnabled: true
 };
+
+// Simple language detection function
+function detectLanguage(text) {
+    const langPatterns = {
+        german: /^(german|deutsch|auf deutsch|wie sagt man)/i,
+        germanWords: /[äöüß]/i,
+        spanish: /^(español|spanish|hablas español)/i,
+        french: /^(français|french|parlez-vous français)/i,
+        italian: /^(italiano|italian|parli italiano)/i,
+        dutch: /^(nederlands|dutch|spreek je nederlands)/i
+    };
+    
+    // Check if user explicitly asks for a language
+    if (langPatterns.german.test(text)) return 'german';
+    if (langPatterns.spanish.test(text)) return 'spanish';
+    if (langPatterns.french.test(text)) return 'french';
+    if (langPatterns.italian.test(text)) return 'italian';
+    if (langPatterns.dutch.test(text)) return 'dutch';
+    
+    // Check for German characters (common in German text)
+    if (langPatterns.germanWords.test(text)) return 'german';
+    
+    return 'auto'; // Let AI detect
+}
 
 // Function to load FAQs from text file (runs on every request)
 function loadFAQs() {
@@ -41,10 +65,8 @@ function loadFAQs() {
         const faqMap = {};
         
         for (const line of lines) {
-            // Skip comments and empty lines
             if (line.trim().startsWith('#') || line.trim() === '') continue;
             
-            // Parse "QUESTION | ANSWER" format
             const pipeIndex = line.indexOf('|');
             if (pipeIndex > 0) {
                 const question = line.substring(0, pipeIndex).trim().toLowerCase();
@@ -55,7 +77,6 @@ function loadFAQs() {
         
         console.log(`✅ Loaded ${Object.keys(faqMap).length} FAQ entries`);
         
-        // Convert to readable text for the bot
         let faqText = "=== OFFICIAL HOTEL INFORMATION (PRIORITY) ===\n\n";
         for (const [q, a] of Object.entries(faqMap)) {
             faqText += `• ${q.toUpperCase()}: ${a}\n`;
@@ -69,7 +90,7 @@ function loadFAQs() {
     }
 }
 
-// Setup endpoint (website optional)
+// Setup endpoint
 app.post('/api/setup', async (req, res) => {
     const { websiteUrl, personality, safetyRules, styleRules } = req.body;
     
@@ -77,7 +98,6 @@ app.post('/api/setup', async (req, res) => {
     if (safetyRules) botConfig.safetyRules = safetyRules;
     if (styleRules) botConfig.styleRules = styleRules;
     
-    // Try to scrape website (optional - won't break if fails)
     if (websiteUrl && websiteUrl !== '') {
         try {
             console.log(`📖 Reading: ${websiteUrl}`);
@@ -95,7 +115,7 @@ app.post('/api/setup', async (req, res) => {
         }
     }
     
-    res.json({ success: true, message: "Setup complete! Bot can answer hotel questions and search the web for local info." });
+    res.json({ success: true, message: "Setup complete! Bot can answer in multiple languages." });
 });
 
 // Update rules
@@ -120,7 +140,7 @@ app.get('/api/get-rules', (req, res) => {
     });
 });
 
-// MAIN CHAT ENDPOINT - With Smart FAQ + Web Search
+// MAIN CHAT ENDPOINT - Multi-lingual
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const userQuestion = req.body.userMessage;
@@ -129,30 +149,44 @@ app.post('/api/chat', async (req, res) => {
         return res.json({ reply: "❌ API key missing. Check your .env file." });
     }
     
-    // Load fresh FAQs on every request
+    // Load FAQs
     const faqData = loadFAQs();
     const faqText = faqData ? faqData.faqText : "No FAQ file loaded.";
     
-    // Detect question types
-    const isBookingQuestion = /availability|available|book|booking|price|cost|rate|check in|check out|room for|dates?|how much|what.*price/i.test(userQuestion);
-    const isHotelPolicyQuestion = /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|shuttle|tax/i.test(userQuestion);
-    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|transport|taxi|bus|train|airport|directions|nearby|around here|local|sightseeing|thing to do/i.test(userQuestion);
+    // Detect language
+    const detectedLang = detectLanguage(userQuestion);
+    let languageInstruction = "";
     
-    // Build smart instructions based on question type
+    switch(detectedLang) {
+        case 'german':
+            languageInstruction = "IMPORTANT: The user is writing in GERMAN. You MUST respond in GERMAN (Deutsch). Use 'Sie' form (formal) unless guest uses 'du'.";
+            break;
+        case 'spanish':
+            languageInstruction = "IMPORTANT: The user is writing in SPANISH. You MUST respond in SPANISH (Español). Use 'usted' form.";
+            break;
+        case 'french':
+            languageInstruction = "IMPORTANT: The user is writing in FRENCH. You MUST respond in FRENCH (Français). Use 'vous' form.";
+            break;
+        case 'italian':
+            languageInstruction = "IMPORTANT: The user is writing in ITALIAN. You MUST respond in ITALIAN (Italiano). Use 'lei' form.";
+            break;
+        case 'dutch':
+            languageInstruction = "IMPORTANT: The user is writing in DUTCH. You MUST respond in DUTCH (Nederlands). Use 'u' form.";
+            break;
+        default:
+            languageInstruction = "IMPORTANT: Respond in the SAME LANGUAGE as the user's question. If user writes in German, answer in German. If Spanish, answer in Spanish. If English, answer in English. Match their language exactly.";
+            break;
+    }
+    
+    // Detect question types
+    const isBookingQuestion = /availability|available|book|booking|price|cost|rate|check in|check out|room for|dates?|how much|what.*price|buchen|verfügbarkeit|preis/i.test(userQuestion);
+    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|transport|taxi|bus|train|airport|directions|nearby|around here|local|sightseeing|thing to do|wetter|restaurant|sehenswürdigkeiten/i.test(userQuestion);
+    
+    // Build search instructions
     let searchInstructions = "";
     if (botConfig.webSearchEnabled && isLocalInfoQuestion) {
         searchInstructions = `
-You HAVE the ability to search the web. For questions about LOCAL INFO (weather, restaurants, attractions, transport, directions, events), you MUST search the web to provide current, accurate information.
-
-When you search, be specific and helpful. For restaurant questions, include type of cuisine and price range if found.
-`;
-    } else if (isHotelPolicyQuestion) {
-        searchInstructions = `
-DO NOT search the web for hotel policy questions. Answer ONLY using the FAQ below.
-`;
-    } else if (isBookingQuestion) {
-        searchInstructions = `
-For booking/availability questions, do NOT search. Simply direct the guest to the booking link.
+You HAVE the ability to search the web. For questions about LOCAL INFO (weather, restaurants, attractions, transport), you MUST search the web to provide current information.
 `;
     }
     
@@ -162,6 +196,8 @@ PERSONALITY: ${botConfig.personality}
 SAFETY RULES: ${botConfig.safetyRules}
 STYLE RULES: ${botConfig.styleRules}
 
+${languageInstruction}
+
 ${faqText}
 
 WEBSITE INFO (limited): ${botConfig.websiteContent || "No website content"}
@@ -169,23 +205,22 @@ WEBSITE INFO (limited): ${botConfig.websiteContent || "No website content"}
 ${searchInstructions}
 
 SPECIAL RULES:
-1. For BOOKING/AVAILABILITY questions → Respond with: "Please check real-time availability here: ${botConfig.bookingLink}"
+1. For BOOKING/AVAILABILITY questions → Respond with the booking link: ${botConfig.bookingLink}
 2. For HOTEL POLICY questions → Answer ONLY from the FAQ above
 3. For LOCAL INFO questions → Use web search to find current information
-4. For anything else → Use your best judgment
+4. MATCH THE USER'S LANGUAGE in your response
 
 GUEST QUESTION: ${userQuestion}
 
-Provide a helpful, concise answer.`;
+Provide a helpful, concise answer in the SAME LANGUAGE as the question.`;
 
     try {
-        // Build API request with optional web search
         const apiRequest = {
             model: "deepseek-chat",
             messages: [
                 { 
                     role: "system", 
-                    content: "You are a hotel concierge. You can search the web for local information like weather, restaurants, and attractions." 
+                    content: "You are a multi-lingual hotel concierge. You can answer in German, English, Spanish, French, Italian, and Dutch. Always respond in the same language the guest uses." 
                 },
                 { role: "user", content: systemPrompt }
             ],
@@ -193,10 +228,9 @@ Provide a helpful, concise answer.`;
             max_tokens: 500
         };
         
-        // Add web search ONLY for local info questions
         if (botConfig.webSearchEnabled && isLocalInfoQuestion) {
             apiRequest.search_enabled = true;
-            console.log('🔍 Web search enabled for this question');
+            console.log('🔍 Web search enabled');
         }
         
         const response = await axios.post('https://api.deepseek.com/v1/chat/completions', apiRequest, {
@@ -204,34 +238,23 @@ Provide a helpful, concise answer.`;
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
-            timeout: 45000  // Longer timeout for web search
+            timeout: 45000
         });
         
         let reply = response.data.choices[0].message.content;
         
-        // Add booking link if missing on booking questions
-        if (isBookingQuestion && !reply.includes('direct-book.com') && !reply.includes('booking')) {
-            reply += `\n\n🔗 Check availability and book here: ${botConfig.bookingLink}`;
-        }
-        
-        // Small note when web search was used
-        if (isLocalInfoQuestion && botConfig.webSearchEnabled && !reply.includes('I searched')) {
-            // Optional: add a subtle indicator
-            console.log('✅ Web search response sent');
+        if (isBookingQuestion && !reply.includes('direct-book.com')) {
+            reply += `\n\n🔗 ${detectedLang === 'german' ? 'Hier buchen:' : 'Book here:'} ${botConfig.bookingLink}`;
         }
         
         res.json({ reply: reply });
         
     } catch (error) {
         console.error('Chat error:', error.message);
-        if (error.response) {
-            console.error('API Response:', error.response.data);
-        }
-        res.json({ reply: "I'm having trouble answering right now. Please try again in a moment." });
+        res.json({ reply: "I'm having trouble right now. Please try again. / Entschuldigung, bitte versuchen Sie es später erneut." });
     }
 });
 
-// Toggle web search endpoint
 app.post('/api/toggle-search', (req, res) => {
     const { enabled } = req.body;
     botConfig.webSearchEnabled = enabled;
@@ -241,9 +264,9 @@ app.post('/api/toggle-search', (req, res) => {
 
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`\n✅ SMART Hotel Chat Bot running at http://localhost:${PORT}`);
+    console.log(`\n✅ MULTI-LINGUAL Hotel Chat Bot running at http://localhost:${PORT}`);
     console.log(`🔑 API Key: ${process.env.DEEPSEEK_API_KEY ? '✅ Set' : '❌ Missing'}`);
     console.log(`📝 FAQ file: ${fs.existsSync(path.join(__dirname, 'hotel-faqs.txt')) ? '✅ Found' : '❌ Not found'}`);
     console.log(`🔍 Web Search: ${botConfig.webSearchEnabled ? '✅ Enabled' : '❌ Disabled'}`);
-    console.log(`\n💡 Bot can now answer hotel questions AND search the web for local info!\n`);
+    console.log(`🌍 Languages: German, English, Spanish, French, Italian, Dutch (auto-detects)\n`);
 });
