@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Hotel AI Assistant - Admin Control Panel</title>
+    <title>Hotel Vogelweiderhof - AI Assistant Admin</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
@@ -272,24 +272,24 @@
     </div>
     
     <div class="container">
-        <!-- PANEL 1: INITIAL SETUP -->
+        <!-- PANEL 1: INITIAL SETUP - YOUR RULES PRE-LOADED -->
         <div class="panel">
             <h2>📥 1. Initial Setup</h2>
             <label>Hotel Website URL (optional):</label>
-            <input type="text" id="websiteUrl" placeholder="https://your-hotel.com">
+            <input type="text" id="websiteUrl" placeholder="https://direct-book.com/properties/hotelvogelweiderhof">
             
             <label>Bot Personality:</label>
-            <textarea id="personality" rows="4">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
+            <textarea id="personality" rows="5">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
             
             <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="6">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
+            <textarea id="safetyRules" rows="7">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
             
             <label>Style Rules:</label>
-            <textarea id="styleRules" rows="6">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
+            <textarea id="styleRules" rows="7">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
             
             <button onclick="setupBot()">📥 Load Setup (with these rules)</button>
             <div id="status" class="status"></div>
-            <div class="rule-preview">✨ Your custom rules will be saved and used by the bot</div>
+            <div class="rule-preview">✨ Your custom rules are pre-loaded. Click "Load Setup" to activate them.</div>
         </div>
         
         <!-- PANEL 2: LIVE RULES EDITOR -->
@@ -375,6 +375,13 @@
         let botReady = false;
         let webSearchEnabled = true;
         let topicFilterEnabled = true;
+        
+        // ========== YOUR PRE-LOADED RULES ==========
+        const defaultPersonality = `You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.`;
+        
+        const defaultSafety = `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.`;
+        
+        const defaultStyle = `Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.`;
         
         // Get current URL for chat link
         function getChatLink() {
@@ -598,11 +605,16 @@
         
         // ========== INITIALIZE ==========
         
+        // Pre-fill the setup panel with your rules (already in HTML, but ensure they're there)
+        document.getElementById('personality').value = defaultPersonality;
+        document.getElementById('safetyRules').value = defaultSafety;
+        document.getElementById('styleRules').value = defaultStyle;
+        
         updateChatLinkDisplay();
         loadLimits();
         loadCurrentRules();
         
-        // Update chat link if URL changes (for dynamic environments)
+        // Update chat link if URL changes
         setInterval(updateChatLinkDisplay, 1000);
     </script>
 </body>
