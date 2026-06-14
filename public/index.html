@@ -2,76 +2,130 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Hotel AI Assistant - Admin</title>
+    <title>Hotel AI Assistant - Admin Control Panel</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 1600px; margin: 0 auto; display: flex; gap: 20px; flex-wrap: wrap; }
-        .setup-panel, .rules-panel, .limits-panel, .chat-panel {
+        
+        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+        
+        .panel {
             background: white;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 20px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        .setup-panel { flex: 1; min-width: 260px; }
-        .rules-panel { flex: 1; min-width: 260px; }
-        .limits-panel { flex: 0.8; min-width: 240px; }
-        .chat-panel { flex: 1.2; min-width: 350px; }
-        h2, h3 { margin-bottom: 15px; color: #333; font-size: 1.2rem; }
+        
+        .panel h2 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #0066cc;
+            color: #0066cc;
+        }
+        
+        .panel h3 {
+            font-size: 1rem;
+            margin: 15px 0 10px 0;
+            color: #555;
+        }
+        
+        label {
+            display: block;
+            font-weight: bold;
+            margin-top: 12px;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+        
         input, textarea, select {
             width: 100%;
-            padding: 8px;
-            margin: 6px 0;
+            padding: 8px 10px;
+            margin-bottom: 8px;
             border: 1px solid #ddd;
-            border-radius: 5px;
+            border-radius: 6px;
+            font-size: 14px;
         }
+        
+        textarea {
+            resize: vertical;
+            font-family: inherit;
+        }
+        
         button {
             background: #0066cc;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
+            padding: 10px 16px;
+            border-radius: 6px;
             cursor: pointer;
-            margin: 5px 0;
+            margin-top: 10px;
             width: 100%;
+            font-size: 14px;
+            font-weight: bold;
         }
+        
         button:hover { background: #0052a3; }
         button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
         button.danger { background: #dc3545; }
-        .status { margin-top: 10px; padding: 8px; border-radius: 5px; font-size: 12px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        .messages {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            background: #f9f9f9;
+        button.danger:hover { background: #c82333; }
+        
+        .status {
+            margin-top: 12px;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 12px;
         }
-        .user-msg { text-align: right; margin: 8px; padding: 6px 10px; background: #0066cc; color: white; border-radius: 12px; display: inline-block; float: right; clear: both; max-width: 80%; font-size: 13px; }
-        .bot-msg { text-align: left; margin: 8px; padding: 6px 10px; background: #e9ecef; border-radius: 12px; display: inline-block; float: left; clear: both; max-width: 80%; font-size: 13px; }
-        .limit-input { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-        .limit-input label { flex: 1; font-size: 13px; }
-        .limit-input input { flex: 1; width: auto; margin: 0; }
-        .limit-input span { font-size: 12px; color: #666; width: 60px; }
-        hr { margin: 15px 0; }
+        .success-bg { background: #d4edda; color: #155724; }
+        .error-bg { background: #f8d7da; color: #721c24; }
+        .info-bg { background: #d1ecf1; color: #0c5460; }
+        
+        .limit-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 0;
+        }
+        .limit-row label {
+            flex: 1;
+            margin: 0;
+            font-size: 13px;
+        }
+        .limit-row input {
+            flex: 1;
+            margin: 0;
+            width: auto;
+        }
+        .limit-row span {
+            width: 60px;
+            font-size: 12px;
+            color: #666;
+        }
+        
         .toggle-switch {
             display: flex;
             align-items: center;
             justify-content: space-between;
             background: #f8f9fa;
-            padding: 8px;
+            padding: 10px 12px;
             border-radius: 8px;
-            margin: 8px 0;
+            margin: 12px 0;
         }
+        .toggle-label { font-weight: bold; font-size: 13px; }
         .toggle-button {
-            width: 44px;
-            height: 22px;
+            width: 50px;
+            height: 24px;
             background: #ccc;
-            border-radius: 22px;
+            border-radius: 24px;
             cursor: pointer;
             position: relative;
             transition: 0.3s;
@@ -79,8 +133,8 @@
         .toggle-button.active { background: #28a745; }
         .toggle-button::after {
             content: '';
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             background: white;
             border-radius: 50%;
             position: absolute;
@@ -88,94 +142,171 @@
             left: 3px;
             transition: 0.3s;
         }
-        .toggle-button.active::after { left: 23px; }
+        .toggle-button.active::after { left: 27px; }
+        
+        .messages {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+        .user-msg {
+            text-align: right;
+            margin: 8px;
+            padding: 8px 12px;
+            background: #0066cc;
+            color: white;
+            border-radius: 12px;
+            display: inline-block;
+            float: right;
+            clear: both;
+            max-width: 80%;
+            font-size: 13px;
+        }
+        .bot-msg {
+            text-align: left;
+            margin: 8px;
+            padding: 8px 12px;
+            background: #e9ecef;
+            color: black;
+            border-radius: 12px;
+            display: inline-block;
+            float: left;
+            clear: both;
+            max-width: 80%;
+            font-size: 13px;
+        }
+        
+        .current-values {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+        
+        hr { margin: 15px 0; }
+        
+        @media (max-width: 1200px) {
+            .container { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 700px) {
+            .container { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
+    <h1>🏨 Hotel AI Assistant - Admin Control Panel</h1>
+    
     <div class="container">
-        <!-- Panel 1: Setup -->
-        <div class="setup-panel">
-            <h2>🏨 1. Setup</h2>
-            <label>Hotel URL (optional):</label>
-            <input type="text" id="websiteUrl" placeholder="https://...">
-            <label>Personality:</label>
+        <!-- PANEL 1: INITIAL SETUP -->
+        <div class="panel">
+            <h2>📥 1. Initial Setup</h2>
+            <label>Hotel Website URL (optional):</label>
+            <input type="text" id="websiteUrl" placeholder="https://your-hotel.com">
+            
+            <label>Bot Personality:</label>
             <textarea id="personality" rows="2">You are a friendly hotel front desk agent.</textarea>
+            
             <label>Safety Rules:</label>
             <textarea id="safetyRules" rows="2">Never swear. Stay child-friendly.</textarea>
+            
             <label>Style Rules:</label>
             <textarea id="styleRules" rows="2">Be concise. Answer in 1-2 sentences.</textarea>
+            
             <button onclick="setupBot()">📥 Load Setup</button>
-            <div id="status"></div>
+            <div id="status" class="status"></div>
         </div>
         
-        <!-- Panel 2: Live Rules -->
-        <div class="rules-panel">
+        <!-- PANEL 2: BOT RULES -->
+        <div class="panel">
             <h2>⚙️ 2. Bot Rules</h2>
-            <label>Live Personality:</label>
+            <label>Personality (Live):</label>
             <textarea id="livePersonality" rows="2"></textarea>
-            <label>Live Safety:</label>
+            
+            <label>Safety Rules (Live):</label>
             <textarea id="liveSafety" rows="2"></textarea>
-            <label>Live Style:</label>
+            
+            <label>Style Rules (Live):</label>
             <textarea id="liveStyle" rows="2"></textarea>
+            
             <div class="toggle-switch">
-                <span>🔍 Web Search</span>
+                <span class="toggle-label">🔍 Web Search (local info)</span>
                 <div id="webSearchToggle" class="toggle-button" onclick="toggleWebSearch()"></div>
             </div>
+            
             <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
-            <hr>
-            <div id="activeRulesDisplay" style="font-size: 12px;"></div>
+            
+            <div class="current-values" id="activeRulesDisplay">
+                <strong>Current Rules:</strong><br>
+                Loading...
+            </div>
         </div>
         
-        <!-- Panel 3: Limits Control -->
-        <div class="limits-panel">
-            <h2>🛡️ 3. Limits</h2>
-            <div class="limit-input">
-                <label>Tokens/response:</label>
-                <input type="number" id="maxTokens" min="50" max="500" step="10">
+        <!-- PANEL 3: LIMITS CONTROL (THIS IS WHAT YOU WANTED) -->
+        <div class="panel">
+            <h2>🛡️ 3. Limits Control</h2>
+            
+            <div class="limit-row">
+                <label>Max tokens per response:</label>
+                <input type="number" id="maxTokens" min="50" max="500" step="10" value="200">
                 <span>tokens</span>
             </div>
-            <div class="limit-input">
-                <label>Msgs/session:</label>
-                <input type="number" id="maxSession" min="5" max="50" step="1">
+            
+            <div class="limit-row">
+                <label>Max messages per session:</label>
+                <input type="number" id="maxSession" min="5" max="50" step="1" value="15">
                 <span>messages</span>
             </div>
-            <div class="limit-input">
-                <label>Msgs/minute:</label>
-                <input type="number" id="maxPerMinute" min="5" max="30" step="1">
-                <span>/min</span>
+            
+            <div class="limit-row">
+                <label>Max questions per minute:</label>
+                <input type="number" id="maxPerMinute" min="5" max="30" step="1" value="10">
+                <span>/minute</span>
             </div>
-            <div class="limit-input">
-                <label>Daily quota:</label>
-                <input type="number" id="dailyQuota" min="20" max="200" step="10">
-                <span>/day</span>
+            
+            <div class="limit-row">
+                <label>Daily quota per user:</label>
+                <input type="number" id="dailyQuota" min="20" max="200" step="10" value="50">
+                <span>questions/day</span>
             </div>
+            
             <div class="toggle-switch">
-                <span>🚫 Topic Filter</span>
+                <span class="toggle-label">🚫 Topic Filter (block off-topic)</span>
                 <div id="topicFilterToggle" class="toggle-button" onclick="toggleTopicFilter()"></div>
             </div>
+            
             <button onclick="saveLimits()" class="success">💾 Save Limits</button>
-            <button onclick="loadLimits()">📋 Refresh</button>
-            <hr>
-            <div id="limitsDisplay" style="font-size: 11px; color: #666;"></div>
+            <button onclick="loadLimits()">🔄 Refresh Limits</button>
+            
+            <div class="current-values" id="limitsDisplay">
+                <strong>Current Limits:</strong><br>
+                Loading...
+            </div>
         </div>
         
-        <!-- Panel 4: Chat -->
-        <div class="chat-panel">
+        <!-- PANEL 4: TEST CHAT -->
+        <div class="panel">
             <h2>💬 4. Test Chat</h2>
             <div class="messages" id="messages">
-                <div class="bot-msg">👋 Admin panel ready! Configure limits above.</div>
+                <div class="bot-msg">👋 Admin ready! Configure limits above and test here.</div>
             </div>
-            <input type="text" id="question" placeholder="Test the bot..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <input type="text" id="question" placeholder="Type a test question..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
     
     <script>
+        // Global variables
         let botReady = false;
         let webSearchEnabled = true;
         let topicFilterEnabled = true;
         
-        // Load current limits from server
+        // ========== LIMITS FUNCTIONS ==========
+        
         async function loadLimits() {
             try {
                 const response = await fetch('/api/limits');
@@ -188,10 +319,12 @@
                 updateTopicFilterToggle();
                 displayLimits();
                 console.log('Limits loaded:', limits);
-            } catch(e) { console.error('Failed to load limits'); }
+            } catch(e) { 
+                console.error('Failed to load limits', e);
+                document.getElementById('limitsDisplay').innerHTML = '<strong>Error loading limits</strong>';
+            }
         }
         
-        // Save limits to server
         async function saveLimits() {
             const limits = {
                 maxTokensPerResponse: parseInt(document.getElementById('maxTokens').value),
@@ -209,10 +342,14 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    addMessage('bot', '✅ Limits updated successfully!');
+                    addMessage('bot', '✅ Limits saved successfully!');
                     displayLimits();
+                } else {
+                    addMessage('bot', '❌ Failed to save limits');
                 }
-            } catch(e) { addMessage('bot', '❌ Failed to save limits'); }
+            } catch(e) { 
+                addMessage('bot', '❌ Error saving limits');
+            }
         }
         
         function displayLimits() {
@@ -221,8 +358,12 @@
             const minute = document.getElementById('maxPerMinute').value;
             const daily = document.getElementById('dailyQuota').value;
             document.getElementById('limitsDisplay').innerHTML = `
-                📊 Current: ${tokens} tokens | ${session} msgs/session | ${minute}/min | ${daily}/day<br>
-                🚫 Topic Filter: ${topicFilterEnabled ? 'ON' : 'OFF'}
+                <strong>Current Limits:</strong><br>
+                • Tokens/response: ${tokens}<br>
+                • Messages/session: ${session}<br>
+                • Questions/minute: ${minute}<br>
+                • Daily quota: ${daily}<br>
+                • Topic Filter: ${topicFilterEnabled ? '✅ ON' : '❌ OFF'}
             `;
         }
         
@@ -236,7 +377,10 @@
             topicFilterEnabled = !topicFilterEnabled;
             updateTopicFilterToggle();
             displayLimits();
+            addMessage('bot', `🚫 Topic filter ${topicFilterEnabled ? 'enabled' : 'disabled'}`);
         }
+        
+        // ========== WEB SEARCH TOGGLE ==========
         
         function updateWebSearchToggle() {
             const toggle = document.getElementById('webSearchToggle');
@@ -255,6 +399,8 @@
             addMessage('bot', `🔍 Web search ${webSearchEnabled ? 'enabled' : 'disabled'}`);
         }
         
+        // ========== SETUP FUNCTIONS ==========
+        
         async function setupBot() {
             const websiteUrl = document.getElementById('websiteUrl').value;
             const personality = document.getElementById('personality').value;
@@ -262,7 +408,7 @@
             const styleRules = document.getElementById('styleRules').value;
             const statusDiv = document.getElementById('status');
             
-            statusDiv.innerHTML = '<div class="info">⏳ Setting up...</div>';
+            statusDiv.innerHTML = '<div class="info-bg">⏳ Setting up...</div>';
             
             try {
                 const response = await fetch('/api/setup', {
@@ -273,16 +419,18 @@
                 const data = await response.json();
                 if (data.success) {
                     botReady = true;
-                    statusDiv.innerHTML = '<div class="success">✅ Bot ready!</div>';
+                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready!</div>';
                     document.getElementById('livePersonality').value = personality;
                     document.getElementById('liveSafety').value = safetyRules;
                     document.getElementById('liveStyle').value = styleRules;
                     addMessage('bot', 'Setup complete! Limits are active.');
                     loadCurrentRules();
                 } else {
-                    statusDiv.innerHTML = '<div class="error">❌ Failed</div>';
+                    statusDiv.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
                 }
-            } catch(e) { statusDiv.innerHTML = '<div class="error">❌ Connection error</div>'; }
+            } catch(e) { 
+                statusDiv.innerHTML = '<div class="error-bg">❌ Connection error</div>';
+            }
         }
         
         async function updateRulesOnly() {
@@ -296,6 +444,7 @@
                 body: JSON.stringify({ personality, safetyRules, styleRules, webSearchEnabled })
             });
             addMessage('bot', '✨ Rules updated!');
+            loadCurrentRules();
         }
         
         async function loadCurrentRules() {
@@ -307,15 +456,26 @@
                 document.getElementById('liveStyle').value = rules.styleRules;
                 webSearchEnabled = rules.webSearchEnabled;
                 updateWebSearchToggle();
+                
+                document.getElementById('activeRulesDisplay').innerHTML = `
+                    <strong>Current Rules:</strong><br>
+                    • Personality: ${rules.personality.substring(0, 50)}...<br>
+                    • Safety: ${rules.safetyRules.substring(0, 50)}...<br>
+                    • Style: ${rules.styleRules.substring(0, 50)}...<br>
+                    • Web Search: ${rules.webSearchEnabled ? '✅ ON' : '❌ OFF'}
+                `;
             } catch(e) {}
         }
         
+        // ========== CHAT FUNCTIONS ==========
+        
         async function sendMessage() {
-            const question = document.getElementById('question').value.trim();
+            const input = document.getElementById('question');
+            const question = input.value.trim();
             if (!question) return;
             
             addMessage('user', question);
-            document.getElementById('question').value = '';
+            input.value = '';
             addMessage('bot', '🤔 Thinking...');
             
             try {
@@ -331,7 +491,7 @@
             } catch(e) {
                 const messagesDiv = document.getElementById('messages');
                 messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', '❌ Error');
+                addMessage('bot', '❌ Error connecting to server');
             }
         }
         
@@ -343,6 +503,8 @@
             messagesDiv.appendChild(msgDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
+        
+        // ========== INITIALIZE ==========
         
         loadLimits();
         loadCurrentRules();
