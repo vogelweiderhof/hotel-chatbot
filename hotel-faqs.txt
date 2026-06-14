@@ -20,6 +20,16 @@ PARKING | Free on-site parking available. no parking Reservation. parking is aft
 RESTAURANT | currently we only serve breakfast.
 
 ADRESS | Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg
+LOCATION | Located in Schallmoos. Bus 21 goes directly into City Center. Bus 120/121 to trainstation. Bus stop is just 30meters from the hotel. 
+POSTAL CODE | 5020
+CITY | Salzburg
+COUNTRY | Austria
+NEAREST BUS STOP | Baron Schwarz Park, 30 meters from hotel.
+BUS LINES | Bus line 21 goes through the City Center. Bus line 120 and 121 go to the trainstation.
+BUS NAVIGATION | USe Google map as all bus lines are integrated. click on the bus stop to see the timer of when the next bus will arrive. The Website www.oebb.at Always up to date.
+
+WALKING TO CITY CENTER | Walking will take 30-45 minutes. the distance is around 2-2,5km. Easiest is to follow the Vogelweiderstraße towards the City Center, at the end of the street, turn Right and you will be Walking into the City Center. 
+TAXI | Taxi number is 0043 662 8111. Uber and some other ride Vehicle app also work, but may are limited in numerbers. 
 
 RECEPTION | Reception of Hotel is in Building B. which is in the Courtyard. 
 
