@@ -7,7 +7,51 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
         
-        h1 { text-align: center; margin-bottom: 20px; color: #333; }
+        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        
+        /* Chat Link Banner */
+        .chat-link-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 1600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .chat-link-banner h3 { margin-bottom: 10px; font-size: 1.1rem; }
+        .chat-link-banner a {
+            color: white;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 1.1rem;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        .chat-link-banner a:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .chat-link-banner small {
+            display: block;
+            margin-top: 8px;
+            opacity: 0.8;
+            font-size: 0.8rem;
+        }
+        .copy-btn {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 0.8rem;
+        }
+        .copy-btn:hover { background: rgba(255,255,255,0.5); }
         
         .container {
             max-width: 1600px;
@@ -57,7 +101,8 @@
         
         textarea {
             resize: vertical;
-            font-family: inherit;
+            font-family: monospace;
+            font-size: 12px;
         }
         
         button {
@@ -76,8 +121,6 @@
         button:hover { background: #0052a3; }
         button.success { background: #28a745; }
         button.success:hover { background: #218838; }
-        button.danger { background: #dc3545; }
-        button.danger:hover { background: #c82333; }
         
         .status {
             margin-top: 12px;
@@ -186,6 +229,8 @@
             border-radius: 8px;
             margin-top: 15px;
             font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
         }
         
         hr { margin: 15px 0; }
@@ -196,10 +241,35 @@
         @media (max-width: 700px) {
             .container { grid-template-columns: 1fr; }
         }
+        
+        .rule-preview {
+            background: #e8f4fd;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #0066cc;
+        }
+        
+        .link-hint {
+            background: #fff3cd;
+            padding: 8px;
+            border-radius: 6px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #856404;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
-    <h1>🏨 Hotel AI Assistant - Admin Control Panel</h1>
+    <!-- CHAT LINK BANNER - Prominently displayed -->
+    <div class="chat-link-banner" id="chatLinkBanner">
+        <h3>💬 Guest Chat Interface</h3>
+        <a href="#" id="chatLink" target="_blank">Loading chat link...</a>
+        <button class="copy-btn" onclick="copyChatLink()">📋 Copy Link</button>
+        <small>Share this link with guests. No setup needed - just chat!</small>
+    </div>
     
     <div class="container">
         <!-- PANEL 1: INITIAL SETUP -->
@@ -209,44 +279,45 @@
             <input type="text" id="websiteUrl" placeholder="https://your-hotel.com">
             
             <label>Bot Personality:</label>
-            <textarea id="personality" rows="2">You are a friendly hotel front desk agent.</textarea>
+            <textarea id="personality" rows="4">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
             
             <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="2">Never swear. Stay child-friendly.</textarea>
+            <textarea id="safetyRules" rows="6">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
             
             <label>Style Rules:</label>
-            <textarea id="styleRules" rows="2">Be concise. Answer in 1-2 sentences.</textarea>
+            <textarea id="styleRules" rows="6">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
             
-            <button onclick="setupBot()">📥 Load Setup</button>
+            <button onclick="setupBot()">📥 Load Setup (with these rules)</button>
             <div id="status" class="status"></div>
+            <div class="rule-preview">✨ Your custom rules will be saved and used by the bot</div>
         </div>
         
-        <!-- PANEL 2: BOT RULES -->
+        <!-- PANEL 2: LIVE RULES EDITOR -->
         <div class="panel">
-            <h2>⚙️ 2. Bot Rules</h2>
-            <label>Personality (Live):</label>
-            <textarea id="livePersonality" rows="2"></textarea>
+            <h2>⚙️ 2. Edit Rules (Live)</h2>
+            <label>Personality:</label>
+            <textarea id="livePersonality" rows="4"></textarea>
             
-            <label>Safety Rules (Live):</label>
-            <textarea id="liveSafety" rows="2"></textarea>
+            <label>Safety Rules:</label>
+            <textarea id="liveSafety" rows="5"></textarea>
             
-            <label>Style Rules (Live):</label>
-            <textarea id="liveStyle" rows="2"></textarea>
+            <label>Style Rules:</label>
+            <textarea id="liveStyle" rows="5"></textarea>
             
             <div class="toggle-switch">
                 <span class="toggle-label">🔍 Web Search (local info)</span>
                 <div id="webSearchToggle" class="toggle-button" onclick="toggleWebSearch()"></div>
             </div>
             
-            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
+            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules Now</button>
             
-            <div class="current-values" id="activeRulesDisplay">
-                <strong>Current Rules:</strong><br>
-                Loading...
+            <div class="link-hint">
+                💡 <strong>Guest Chat Link:</strong><br>
+                <span id="inlineChatLink">Loading...</span>
             </div>
         </div>
         
-        <!-- PANEL 3: LIMITS CONTROL (THIS IS WHAT YOU WANTED) -->
+        <!-- PANEL 3: LIMITS CONTROL -->
         <div class="panel">
             <h2>🛡️ 3. Limits Control</h2>
             
@@ -270,7 +341,7 @@
             
             <div class="limit-row">
                 <label>Daily quota per user:</label>
-                <input type="number" id="dailyQuota" min="20" max="200" step="10" value="50">
+                <input type="number" id="dailyQuota" min="20" max="1000" step="10" value="500">
                 <span>questions/day</span>
             </div>
             
@@ -292,7 +363,7 @@
         <div class="panel">
             <h2>💬 4. Test Chat</h2>
             <div class="messages" id="messages">
-                <div class="bot-msg">👋 Admin ready! Configure limits above and test here.</div>
+                <div class="bot-msg">👋 Welcome to Hotel Vogelweiderhof! I'm your AI assistant. I can help with check-in/out times, WiFi, breakfast, local attractions, and more. How may I assist you today?</div>
             </div>
             <input type="text" id="question" placeholder="Type a test question..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button onclick="sendMessage()">Send</button>
@@ -304,6 +375,37 @@
         let botReady = false;
         let webSearchEnabled = true;
         let topicFilterEnabled = true;
+        
+        // Get current URL for chat link
+        function getChatLink() {
+            const currentUrl = window.location.href;
+            const baseUrl = currentUrl.split('/').slice(0, 3).join('/');
+            return baseUrl + '/chat.html';
+        }
+        
+        function updateChatLinkDisplay() {
+            const chatLink = getChatLink();
+            const chatLinkElement = document.getElementById('chatLink');
+            const inlineChatLink = document.getElementById('inlineChatLink');
+            
+            if (chatLinkElement) {
+                chatLinkElement.href = chatLink;
+                chatLinkElement.textContent = chatLink;
+            }
+            if (inlineChatLink) {
+                inlineChatLink.innerHTML = `<a href="${chatLink}" target="_blank">${chatLink}</a>`;
+            }
+        }
+        
+        function copyChatLink() {
+            const chatLink = getChatLink();
+            navigator.clipboard.writeText(chatLink).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => { btn.textContent = originalText; }, 2000);
+            });
+        }
         
         // ========== LIMITS FUNCTIONS ==========
         
@@ -318,10 +420,8 @@
                 topicFilterEnabled = limits.topicFilterEnabled;
                 updateTopicFilterToggle();
                 displayLimits();
-                console.log('Limits loaded:', limits);
             } catch(e) { 
                 console.error('Failed to load limits', e);
-                document.getElementById('limitsDisplay').innerHTML = '<strong>Error loading limits</strong>';
             }
         }
         
@@ -419,11 +519,11 @@
                 const data = await response.json();
                 if (data.success) {
                     botReady = true;
-                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready!</div>';
+                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready with your custom rules!</div>';
                     document.getElementById('livePersonality').value = personality;
                     document.getElementById('liveSafety').value = safetyRules;
                     document.getElementById('liveStyle').value = styleRules;
-                    addMessage('bot', 'Setup complete! Limits are active.');
+                    addMessage('bot', 'Setup complete! I am now following your custom personality, safety, and style rules.');
                     loadCurrentRules();
                 } else {
                     statusDiv.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
@@ -443,7 +543,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ personality, safetyRules, styleRules, webSearchEnabled })
             });
-            addMessage('bot', '✨ Rules updated!');
+            addMessage('bot', '✨ Rules updated! I will now follow your new instructions.');
             loadCurrentRules();
         }
         
@@ -456,14 +556,6 @@
                 document.getElementById('liveStyle').value = rules.styleRules;
                 webSearchEnabled = rules.webSearchEnabled;
                 updateWebSearchToggle();
-                
-                document.getElementById('activeRulesDisplay').innerHTML = `
-                    <strong>Current Rules:</strong><br>
-                    • Personality: ${rules.personality.substring(0, 50)}...<br>
-                    • Safety: ${rules.safetyRules.substring(0, 50)}...<br>
-                    • Style: ${rules.styleRules.substring(0, 50)}...<br>
-                    • Web Search: ${rules.webSearchEnabled ? '✅ ON' : '❌ OFF'}
-                `;
             } catch(e) {}
         }
         
@@ -506,8 +598,12 @@
         
         // ========== INITIALIZE ==========
         
+        updateChatLinkDisplay();
         loadLimits();
         loadCurrentRules();
+        
+        // Update chat link if URL changes (for dynamic environments)
+        setInterval(updateChatLinkDisplay, 1000);
     </script>
 </body>
 </html>
