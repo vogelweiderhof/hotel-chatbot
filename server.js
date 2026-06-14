@@ -27,26 +27,83 @@ let cachedFAQ = null;
 let lastFAQModified = 0;
 const FAQ_PATH = path.join(__dirname, 'hotel-faqs.txt');
 
-// ========== ENHANCED ANALYTICS ==========
+// ========== TOKEN & ANALYTICS TRACKING ==========
 const analytics = {
     totalQuestions: 0,
+    totalTokensUsed: 0,
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    estimatedCostUSD: 0, // DeepSeek: ~$0.14 per 1M tokens
     questionsByLanguage: { english: 0, german: 0, spanish: 0, french: 0, italian: 0, chinese: 0, dutch: 0, japanese: 0, korean: 0, other: 0 },
     questionsByCategory: { hotel: 0, transport: 0, local: 0, booking: 0, help: 0, other: 0 },
-    mostAskedQuestions: new Map(), // question text -> count
+    mostAskedQuestions: new Map(),
+    tokenUsageByCategory: { hotel: 0, transport: 0, local: 0, booking: 0, help: 0, other: 0 },
     webSearchUsage: 0,
     blockedQuestions: 0,
     dailyActiveSessions: new Set(),
-    dailyDates: new Map(), // date -> session count
-    startTime: Date.now()
+    dailyDates: new Map(),
+    startTime: Date.now(),
+    tokenHistory: [] // Last 100 token usage entries
 };
+
+// DeepSeek pricing: $0.14 per 1M input tokens, $0.28 per 1M output tokens
+// Using average ~$0.20 per 1M total tokens for estimation
+const COST_PER_MILLION_TOKENS = 0.20;
+
+function updateTokenAnalytics(usage, category) {
+    if (!usage) return;
+    
+    const promptTokens = usage.prompt_tokens || 0;
+    const completionTokens = usage.completion_tokens || 0;
+    const totalTokens = usage.total_tokens || 0;
+    
+    analytics.totalTokensUsed += totalTokens;
+    analytics.totalPromptTokens += promptTokens;
+    analytics.totalCompletionTokens += completionTokens;
+    
+    // Update category-specific token usage
+    if (category && analytics.tokenUsageByCategory[category] !== undefined) {
+        analytics.tokenUsageByCategory[category] += totalTokens;
+    } else {
+        analytics.tokenUsageByCategory.other += totalTokens;
+    }
+    
+    // Update estimated cost
+    const cost = (totalTokens / 1000000) * COST_PER_MILLION_TOKENS;
+    analytics.estimatedCostUSD += cost;
+    
+    // Store last 100 token entries for history
+    analytics.tokenHistory.push({
+        timestamp: new Date().toISOString(),
+        totalTokens,
+        promptTokens,
+        completionTokens,
+        category,
+        cost: cost.toFixed(6)
+    });
+    if (analytics.tokenHistory.length > 100) analytics.tokenHistory.shift();
+}
+
+function getTokenAnalyticsSummary() {
+    return {
+        totalTokens: analytics.totalTokensUsed,
+        totalPromptTokens: analytics.totalPromptTokens,
+        totalCompletionTokens: analytics.totalCompletionTokens,
+        estimatedCostUSD: analytics.estimatedCostUSD.toFixed(4),
+        averageTokensPerQuestion: analytics.totalQuestions > 0 ? (analytics.totalTokensUsed / analytics.totalQuestions).toFixed(0) : 0,
+        tokenUsageByCategory: analytics.tokenUsageByCategory,
+        recentTokenUsage: analytics.tokenHistory.slice(-10)
+    };
+}
 
 // Save analytics every hour
 setInterval(() => {
-    // Get top 10 most asked questions
     const topQuestions = Array.from(analytics.mostAskedQuestions.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([q, c]) => ({ question: q.substring(0, 100), count: c }));
+    
+    const tokenSummary = getTokenAnalyticsSummary();
     
     const stats = {
         totalQuestions: analytics.totalQuestions,
@@ -56,9 +113,10 @@ setInterval(() => {
         webSearchUsage: analytics.webSearchUsage,
         blockedQuestions: analytics.blockedQuestions,
         activeSessionsToday: analytics.dailyActiveSessions.size,
-        uptimeHours: ((Date.now() - analytics.startTime) / 3600000).toFixed(1)
+        uptimeHours: ((Date.now() - analytics.startTime) / 3600000).toFixed(1),
+        tokenAnalytics: tokenSummary
     };
-    console.log('📊 Analytics Snapshot:', stats);
+    console.log('📊 Analytics Snapshot:', JSON.stringify(stats, null, 2));
     fs.writeFileSync(path.join(__dirname, 'analytics.json'), JSON.stringify(stats, null, 2));
 }, 3600000);
 
@@ -210,15 +268,13 @@ function loadFAQs() {
     } catch (error) { return null; }
 }
 
-// ========== ENHANCED MULTI-LANGUAGE DETECTION (10+ Languages) ==========
+// ========== ENHANCED MULTI-LANGUAGE DETECTION ==========
 function detectLanguage(text) {
     analytics.totalQuestions++;
     
-    // Track most asked questions (normalized)
     const normalizedQuestion = text.toLowerCase().replace(/[^\w\s]/g, '').substring(0, 100);
     analytics.mostAskedQuestions.set(normalizedQuestion, (analytics.mostAskedQuestions.get(normalizedQuestion) || 0) + 1);
     
-    // Explicit language requests
     if (/\b(auf deutsch|german|deutsch|sprache deutsch|deutsche)\b/i.test(text)) {
         analytics.questionsByLanguage.german++;
         return 'german';
@@ -252,7 +308,6 @@ function detectLanguage(text) {
         return 'korean';
     }
     
-    // Character-based detection
     if (/[äöüß]/i.test(text)) { analytics.questionsByLanguage.german++; return 'german'; }
     if (/á|é|í|ó|ú|ñ/i.test(text)) { analytics.questionsByLanguage.spanish++; return 'spanish'; }
     if (/ê|è|é|à|ç|û|î|ô|ï|ë/i.test(text) && /\b(je|tu|il|elle|nous|vous)\b/i.test(text)) { analytics.questionsByLanguage.french++; return 'french'; }
@@ -272,6 +327,9 @@ app.get('/api/analytics', (req, res) => {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 15)
         .map(([q, c]) => ({ question: q, count: c }));
+    
+    const tokenSummary = getTokenAnalyticsSummary();
+    
     res.json({
         totalQuestions: analytics.totalQuestions,
         questionsByLanguage: analytics.questionsByLanguage,
@@ -280,7 +338,8 @@ app.get('/api/analytics', (req, res) => {
         webSearchUsage: analytics.webSearchUsage,
         blockedQuestions: analytics.blockedQuestions,
         activeSessionsToday: analytics.dailyActiveSessions.size,
-        uptimeHours: ((Date.now() - analytics.startTime) / 3600000).toFixed(1)
+        uptimeHours: ((Date.now() - analytics.startTime) / 3600000).toFixed(1),
+        tokenAnalytics: tokenSummary
     });
 });
 
@@ -386,6 +445,7 @@ app.post('/api/chat', async (req, res) => {
     
     const isBookingQuestion = /availability|available|book|booking|price|cost|rate|buchen|verfügbarkeit|preis|how much|what.*price/i.test(userQuestion);
     const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|wetter|restaurant|sehenswürdigkeiten|transport|directions|how to get|taxi|bus|train|old town|city center/i.test(userQuestion);
+    const questionCategory = detectCategory(userQuestion);
     
     if (isLocalInfoQuestion && botConfig.webSearchEnabled) analytics.webSearchUsage++;
     
@@ -435,6 +495,12 @@ GUEST: ${userQuestion}`;
         });
         
         let reply = response.data.choices[0].message.content;
+        
+        // Track token usage from API response
+        if (response.data.usage) {
+            updateTokenAnalytics(response.data.usage, questionCategory);
+        }
+        
         if (isBookingQuestion && !reply.includes('direct-book.com')) {
             const bookingText = { english: "Check availability:", german: "Verfügbarkeit prüfen:", spanish: "Ver disponibilidad:", french: "Vérifier disponibilité:", italian: "Verifica disponibilità:", chinese: "查看空房情况：" };
             reply += `\n\n🔗 ${bookingText[detectedLang] || bookingText.english} ${botConfig.bookingLink}`;
@@ -455,7 +521,8 @@ GUEST: ${userQuestion}`;
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
-    console.log(`📊 Analytics: Tracking languages, questions, sessions`);
+    console.log(`📊 Analytics: Tracking questions, tokens, and costs`);
+    console.log(`💰 Token pricing: ~$${COST_PER_MILLION_TOKENS} per 1M tokens`);
     console.log(`🌍 Languages: EN, DE, ES, FR, IT, ZH, NL, JA, KO`);
     console.log(`💾 Conversation memory: Last 5 exchanges`);
     console.log(`🔍 Web search: ${botConfig.webSearchEnabled ? 'ON' : 'OFF'}\n`);

@@ -17,7 +17,7 @@
             border-radius: 12px;
             margin-bottom: 20px;
             text-align: center;
-            max-width: 1600px;
+            max-width: 1800px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -50,7 +50,7 @@
             max-width: 1800px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
         }
         
@@ -204,32 +204,22 @@
             border-radius: 8px;
             margin-top: 15px;
             font-size: 11px;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
         }
         
         hr { margin: 15px 0; }
         
         .analytics-number {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             color: #D4A373;
         }
         .analytics-row {
             display: flex;
             justify-content: space-between;
-            padding: 5px 0;
+            padding: 6px 0;
             border-bottom: 1px solid #eee;
-        }
-        
-        @media (max-width: 1400px) {
-            .container { grid-template-columns: repeat(3, 1fr); }
-        }
-        @media (max-width: 900px) {
-            .container { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 600px) {
-            .container { grid-template-columns: 1fr; }
         }
         
         .rule-preview {
@@ -249,6 +239,19 @@
             font-size: 11px;
             color: #856404;
             word-break: break-all;
+        }
+        
+        .full-width {
+            grid-column: span 3;
+        }
+        
+        @media (max-width: 1400px) {
+            .container { grid-template-columns: repeat(2, 1fr); }
+            .full-width { grid-column: span 2; }
+        }
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
         }
     </style>
 </head>
@@ -361,7 +364,7 @@
             <button onclick="sendMessage()">Send</button>
         </div>
         
-        <!-- PANEL 5: ANALYTICS -->
+        <!-- PANEL 5: ANALYTICS (Questions, Languages, Sessions) -->
         <div class="panel">
             <h2>📊 5. Analytics</h2>
             <div id="analyticsDisplay">
@@ -370,6 +373,18 @@
             <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh Analytics</button>
             <div class="current-values" style="margin-top: 10px;">
                 <small>📈 Data refreshes automatically every 30 seconds</small>
+            </div>
+        </div>
+        
+        <!-- PANEL 6: TOKEN ANALYTICS & COSTS -->
+        <div class="panel">
+            <h2>💰 6. Token Analytics & Costs</h2>
+            <div id="tokenAnalyticsDisplay">
+                <div class="info-bg" style="padding: 10px; text-align: center;">Loading token analytics...</div>
+            </div>
+            <button onclick="refreshTokenAnalytics()" style="background: #D4A373;">🔄 Refresh Token Stats</button>
+            <div class="current-values" style="margin-top: 10px;">
+                <small>💡 DeepSeek cost: ~$0.20 per 1M tokens<br>Track your spending in real-time</small>
             </div>
         </div>
     </div>
@@ -416,23 +431,48 @@
                 const response = await fetch('/api/analytics');
                 const data = await response.json();
                 document.getElementById('analyticsDisplay').innerHTML = `
-                    <div class="analytics-row"><strong>📊 Total Questions</strong> <span class="analytics-number">${data.totalQuestions}</span></div>
-                    <div class="analytics-row"><strong>👥 Active Sessions Today</strong> <span>${data.activeSessionsToday}</span></div>
-                    <div class="analytics-row"><strong>🔍 Web Searches</strong> <span>${data.webSearchUsage}</span></div>
-                    <div class="analytics-row"><strong>🚫 Blocked Questions</strong> <span>${data.blockedQuestions}</span></div>
-                    <div class="analytics-row"><strong>⏱️ Uptime</strong> <span>${data.uptimeHours} hours</span></div>
+                    <div class="analytics-row"><strong>📊 Total Questions</strong> <span class="analytics-number">${data.totalQuestions || 0}</span></div>
+                    <div class="analytics-row"><strong>👥 Active Sessions Today</strong> <span>${data.activeSessionsToday || 0}</span></div>
+                    <div class="analytics-row"><strong>🔍 Web Searches</strong> <span>${data.webSearchUsage || 0}</span></div>
+                    <div class="analytics-row"><strong>🚫 Blocked Questions</strong> <span>${data.blockedQuestions || 0}</span></div>
+                    <div class="analytics-row"><strong>⏱️ Uptime</strong> <span>${data.uptimeHours || 0} hours</span></div>
                     <hr>
                     <strong>🌍 Languages</strong>
-                    ${Object.entries(data.questionsByLanguage).filter(([k,v]) => v > 0).map(([lang, count]) => `<div class="analytics-row">• ${lang} <span>${count}</span></div>`).join('') || '<div>No data yet</div>'}
+                    ${Object.entries(data.questionsByLanguage || {}).filter(([k,v]) => v > 0).map(([lang, count]) => `<div class="analytics-row">• ${lang} <span>${count}</span></div>`).join('') || '<div>No data yet</div>'}
                     <hr>
                     <strong>📂 Categories</strong>
-                    ${Object.entries(data.questionsByCategory).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${count}</span></div>`).join('')}
+                    ${Object.entries(data.questionsByCategory || {}).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${count}</span></div>`).join('')}
                     <hr>
-                    <strong>🔥 Top 5 Questions</strong>
-                    ${data.topQuestions.slice(0, 5).map(q => `<div class="analytics-row">• "${q.question.substring(0, 40)}..." <span>${q.count}×</span></div>`).join('') || '<div>No questions yet</div>'}
+                    <strong>🔥 Top 10 Questions</strong>
+                    ${(data.topQuestions || []).slice(0, 10).map(q => `<div class="analytics-row">• "${q.question.substring(0, 45)}..." <span>${q.count}×</span></div>`).join('') || '<div>No questions yet</div>'}
                 `;
             } catch(e) {
                 document.getElementById('analyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading analytics</div>';
+            }
+        }
+        
+        // ========== TOKEN ANALYTICS ==========
+        async function refreshTokenAnalytics() {
+            try {
+                const response = await fetch('/api/analytics');
+                const data = await response.json();
+                const token = data.tokenAnalytics || {};
+                
+                document.getElementById('tokenAnalyticsDisplay').innerHTML = `
+                    <div class="analytics-row"><strong>💰 Estimated Cost</strong> <span class="analytics-number">$${token.estimatedCostUSD || '0.0000'}</span></div>
+                    <div class="analytics-row"><strong>🎯 Total Tokens Used</strong> <span>${(token.totalTokens || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📥 Prompt Tokens</strong> <span>${(token.totalPromptTokens || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📤 Completion Tokens</strong> <span>${(token.totalCompletionTokens || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📊 Avg Tokens/Question</strong> <span>${token.averageTokensPerQuestion || 0}</span></div>
+                    <hr>
+                    <strong>📂 Tokens by Category</strong>
+                    ${Object.entries(token.tokenUsageByCategory || {}).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${(count || 0).toLocaleString()}</span></div>`).join('') || '<div>No data yet</div>'}
+                    <hr>
+                    <strong>📈 Recent Usage (last 5)</strong>
+                    ${(token.recentTokenUsage || []).slice(-5).reverse().map(t => `<div class="analytics-row">• ${t.timestamp?.substring(5, 16)} | ${t.totalTokens} tokens | $${t.cost} | ${t.category || 'other'}</div>`).join('') || '<div>No recent activity</div>'}
+                `;
+            } catch(e) {
+                document.getElementById('tokenAnalyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading token analytics</div>';
             }
         }
         
@@ -614,8 +654,11 @@
         loadLimits();
         loadCurrentRules();
         refreshAnalytics();
+        refreshTokenAnalytics();
+        
         setInterval(updateChatLinkDisplay, 1000);
         setInterval(refreshAnalytics, 30000);
+        setInterval(refreshTokenAnalytics, 30000);
     </script>
 </body>
 </html>
