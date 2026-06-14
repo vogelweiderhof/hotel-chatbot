@@ -2,16 +2,16 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Hotel Vogelweiderhof - AI Assistant Admin</title>
+    <title>Hotel Vogelweiderhof - AI Admin Panel</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
         
-        h1 { text-align: center; margin-bottom: 10px; color: #333; }
+        h1 { text-align: center; margin-bottom: 10px; color: #3A5E3C; }
         
         /* Chat Link Banner */
         .chat-link-banner {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #D4A373 0%, #588157 100%);
             color: white;
             padding: 15px 20px;
             border-radius: 12px;
@@ -32,15 +32,8 @@
             display: inline-block;
             margin-top: 8px;
         }
-        .chat-link-banner a:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        .chat-link-banner small {
-            display: block;
-            margin-top: 8px;
-            opacity: 0.8;
-            font-size: 0.8rem;
-        }
+        .chat-link-banner a:hover { background: rgba(255,255,255,0.3); }
+        .chat-link-banner small { display: block; margin-top: 8px; opacity: 0.8; font-size: 0.8rem; }
         .copy-btn {
             background: rgba(255,255,255,0.3);
             border: none;
@@ -54,10 +47,10 @@
         .copy-btn:hover { background: rgba(255,255,255,0.5); }
         
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 20px;
         }
         
@@ -69,17 +62,11 @@
         }
         
         .panel h2 {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 2px solid #0066cc;
-            color: #0066cc;
-        }
-        
-        .panel h3 {
-            font-size: 1rem;
-            margin: 15px 0 10px 0;
-            color: #555;
+            border-bottom: 2px solid #D4A373;
+            color: #3A5E3C;
         }
         
         label {
@@ -87,7 +74,7 @@
             font-weight: bold;
             margin-top: 12px;
             margin-bottom: 4px;
-            font-size: 13px;
+            font-size: 12px;
         }
         
         input, textarea, select {
@@ -96,17 +83,17 @@
             margin-bottom: 8px;
             border: 1px solid #ddd;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         textarea {
             resize: vertical;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
         }
         
         button {
-            background: #0066cc;
+            background: #588157;
             color: white;
             border: none;
             padding: 10px 16px;
@@ -118,9 +105,9 @@
             font-weight: bold;
         }
         
-        button:hover { background: #0052a3; }
-        button.success { background: #28a745; }
-        button.success:hover { background: #218838; }
+        button:hover { background: #3A5E3C; }
+        button.success { background: #D4A373; }
+        button.success:hover { background: #c49162; }
         
         .status {
             margin-top: 12px;
@@ -138,21 +125,9 @@
             gap: 10px;
             margin: 12px 0;
         }
-        .limit-row label {
-            flex: 1;
-            margin: 0;
-            font-size: 13px;
-        }
-        .limit-row input {
-            flex: 1;
-            margin: 0;
-            width: auto;
-        }
-        .limit-row span {
-            width: 60px;
-            font-size: 12px;
-            color: #666;
-        }
+        .limit-row label { flex: 1; margin: 0; font-size: 12px; }
+        .limit-row input { flex: 1; margin: 0; width: auto; }
+        .limit-row span { width: 60px; font-size: 11px; color: #666; }
         
         .toggle-switch {
             display: flex;
@@ -163,7 +138,7 @@
             border-radius: 8px;
             margin: 12px 0;
         }
-        .toggle-label { font-weight: bold; font-size: 13px; }
+        .toggle-label { font-weight: bold; font-size: 12px; }
         .toggle-button {
             width: 50px;
             height: 24px;
@@ -173,7 +148,7 @@
             position: relative;
             transition: 0.3s;
         }
-        .toggle-button.active { background: #28a745; }
+        .toggle-button.active { background: #588157; }
         .toggle-button::after {
             content: '';
             width: 20px;
@@ -188,7 +163,7 @@
         .toggle-button.active::after { left: 27px; }
         
         .messages {
-            height: 350px;
+            height: 300px;
             overflow-y: auto;
             border: 1px solid #eee;
             padding: 10px;
@@ -199,20 +174,20 @@
         .user-msg {
             text-align: right;
             margin: 8px;
-            padding: 8px 12px;
-            background: #0066cc;
+            padding: 6px 10px;
+            background: #D4A373;
             color: white;
             border-radius: 12px;
             display: inline-block;
             float: right;
             clear: both;
             max-width: 80%;
-            font-size: 13px;
+            font-size: 12px;
         }
         .bot-msg {
             text-align: left;
             margin: 8px;
-            padding: 8px 12px;
+            padding: 6px 10px;
             background: #e9ecef;
             color: black;
             border-radius: 12px;
@@ -220,7 +195,7 @@
             float: left;
             clear: both;
             max-width: 80%;
-            font-size: 13px;
+            font-size: 12px;
         }
         
         .current-values {
@@ -228,17 +203,32 @@
             padding: 10px;
             border-radius: 8px;
             margin-top: 15px;
-            font-size: 12px;
+            font-size: 11px;
             max-height: 200px;
             overflow-y: auto;
         }
         
         hr { margin: 15px 0; }
         
-        @media (max-width: 1200px) {
+        .analytics-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #D4A373;
+        }
+        .analytics-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        @media (max-width: 1400px) {
+            .container { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 900px) {
             .container { grid-template-columns: repeat(2, 1fr); }
         }
-        @media (max-width: 700px) {
+        @media (max-width: 600px) {
             .container { grid-template-columns: 1fr; }
         }
         
@@ -247,8 +237,8 @@
             padding: 8px;
             border-radius: 6px;
             margin-top: 8px;
-            font-size: 11px;
-            color: #0066cc;
+            font-size: 10px;
+            color: #588157;
         }
         
         .link-hint {
@@ -263,7 +253,9 @@
     </style>
 </head>
 <body>
-    <!-- CHAT LINK BANNER - Prominently displayed -->
+    <h1>🏨 Hotel Vogelweiderhof - AI Assistant Admin Panel</h1>
+    
+    <!-- CHAT LINK BANNER -->
     <div class="chat-link-banner" id="chatLinkBanner">
         <h3>💬 Guest Chat Interface</h3>
         <a href="#" id="chatLink" target="_blank">Loading chat link...</a>
@@ -272,44 +264,44 @@
     </div>
     
     <div class="container">
-        <!-- PANEL 1: INITIAL SETUP - YOUR RULES PRE-LOADED -->
+        <!-- PANEL 1: INITIAL SETUP -->
         <div class="panel">
             <h2>📥 1. Initial Setup</h2>
             <label>Hotel Website URL (optional):</label>
             <input type="text" id="websiteUrl" placeholder="https://direct-book.com/properties/hotelvogelweiderhof">
             
             <label>Bot Personality:</label>
-            <textarea id="personality" rows="5">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
+            <textarea id="personality" rows="4">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
             
             <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="7">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
+            <textarea id="safetyRules" rows="5">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
             
             <label>Style Rules:</label>
-            <textarea id="styleRules" rows="7">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
+            <textarea id="styleRules" rows="5">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
             
-            <button onclick="setupBot()">📥 Load Setup (with these rules)</button>
+            <button onclick="setupBot()">📥 Load Setup</button>
             <div id="status" class="status"></div>
-            <div class="rule-preview">✨ Your custom rules are pre-loaded. Click "Load Setup" to activate them.</div>
+            <div class="rule-preview">✨ Your custom rules are pre-loaded. Click "Load Setup" to activate.</div>
         </div>
         
         <!-- PANEL 2: LIVE RULES EDITOR -->
         <div class="panel">
-            <h2>⚙️ 2. Edit Rules (Live)</h2>
+            <h2>⚙️ 2. Edit Rules</h2>
             <label>Personality:</label>
-            <textarea id="livePersonality" rows="4"></textarea>
+            <textarea id="livePersonality" rows="3"></textarea>
             
             <label>Safety Rules:</label>
-            <textarea id="liveSafety" rows="5"></textarea>
+            <textarea id="liveSafety" rows="3"></textarea>
             
             <label>Style Rules:</label>
-            <textarea id="liveStyle" rows="5"></textarea>
+            <textarea id="liveStyle" rows="3"></textarea>
             
             <div class="toggle-switch">
                 <span class="toggle-label">🔍 Web Search (local info)</span>
                 <div id="webSearchToggle" class="toggle-button" onclick="toggleWebSearch()"></div>
             </div>
             
-            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules Now</button>
+            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
             
             <div class="link-hint">
                 💡 <strong>Guest Chat Link:</strong><br>
@@ -323,7 +315,7 @@
             
             <div class="limit-row">
                 <label>Max tokens per response:</label>
-                <input type="number" id="maxTokens" min="50" max="500" step="10" value="200">
+                <input type="number" id="maxTokens" min="50" max="500" step="10" value="150">
                 <span>tokens</span>
             </div>
             
@@ -346,12 +338,12 @@
             </div>
             
             <div class="toggle-switch">
-                <span class="toggle-label">🚫 Topic Filter (block off-topic)</span>
+                <span class="toggle-label">🚫 Topic Filter</span>
                 <div id="topicFilterToggle" class="toggle-button" onclick="toggleTopicFilter()"></div>
             </div>
             
             <button onclick="saveLimits()" class="success">💾 Save Limits</button>
-            <button onclick="loadLimits()">🔄 Refresh Limits</button>
+            <button onclick="loadLimits()">🔄 Refresh</button>
             
             <div class="current-values" id="limitsDisplay">
                 <strong>Current Limits:</strong><br>
@@ -363,10 +355,22 @@
         <div class="panel">
             <h2>💬 4. Test Chat</h2>
             <div class="messages" id="messages">
-                <div class="bot-msg">👋 Welcome to Hotel Vogelweiderhof! I'm your AI assistant. I can help with check-in/out times, WiFi, breakfast, local attractions, and more. How may I assist you today?</div>
+                <div class="bot-msg">👋 Test your bot here. Changes apply immediately.</div>
             </div>
             <input type="text" id="question" placeholder="Type a test question..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button onclick="sendMessage()">Send</button>
+        </div>
+        
+        <!-- PANEL 5: ANALYTICS -->
+        <div class="panel">
+            <h2>📊 5. Analytics</h2>
+            <div id="analyticsDisplay">
+                <div class="info-bg" style="padding: 10px; text-align: center;">Loading analytics...</div>
+            </div>
+            <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh Analytics</button>
+            <div class="current-values" style="margin-top: 10px;">
+                <small>📈 Data refreshes automatically every 30 seconds</small>
+            </div>
         </div>
     </div>
     
@@ -376,14 +380,7 @@
         let webSearchEnabled = true;
         let topicFilterEnabled = true;
         
-        // ========== YOUR PRE-LOADED RULES ==========
-        const defaultPersonality = `You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.`;
-        
-        const defaultSafety = `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.`;
-        
-        const defaultStyle = `Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.`;
-        
-        // Get current URL for chat link
+        // ========== CHAT LINK ==========
         function getChatLink() {
             const currentUrl = window.location.href;
             const baseUrl = currentUrl.split('/').slice(0, 3).join('/');
@@ -394,7 +391,6 @@
             const chatLink = getChatLink();
             const chatLinkElement = document.getElementById('chatLink');
             const inlineChatLink = document.getElementById('inlineChatLink');
-            
             if (chatLinkElement) {
                 chatLinkElement.href = chatLink;
                 chatLinkElement.textContent = chatLink;
@@ -414,8 +410,33 @@
             });
         }
         
-        // ========== LIMITS FUNCTIONS ==========
+        // ========== ANALYTICS ==========
+        async function refreshAnalytics() {
+            try {
+                const response = await fetch('/api/analytics');
+                const data = await response.json();
+                document.getElementById('analyticsDisplay').innerHTML = `
+                    <div class="analytics-row"><strong>📊 Total Questions</strong> <span class="analytics-number">${data.totalQuestions}</span></div>
+                    <div class="analytics-row"><strong>👥 Active Sessions Today</strong> <span>${data.activeSessionsToday}</span></div>
+                    <div class="analytics-row"><strong>🔍 Web Searches</strong> <span>${data.webSearchUsage}</span></div>
+                    <div class="analytics-row"><strong>🚫 Blocked Questions</strong> <span>${data.blockedQuestions}</span></div>
+                    <div class="analytics-row"><strong>⏱️ Uptime</strong> <span>${data.uptimeHours} hours</span></div>
+                    <hr>
+                    <strong>🌍 Languages</strong>
+                    ${Object.entries(data.questionsByLanguage).filter(([k,v]) => v > 0).map(([lang, count]) => `<div class="analytics-row">• ${lang} <span>${count}</span></div>`).join('') || '<div>No data yet</div>'}
+                    <hr>
+                    <strong>📂 Categories</strong>
+                    ${Object.entries(data.questionsByCategory).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${count}</span></div>`).join('')}
+                    <hr>
+                    <strong>🔥 Top 5 Questions</strong>
+                    ${data.topQuestions.slice(0, 5).map(q => `<div class="analytics-row">• "${q.question.substring(0, 40)}..." <span>${q.count}×</span></div>`).join('') || '<div>No questions yet</div>'}
+                `;
+            } catch(e) {
+                document.getElementById('analyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading analytics</div>';
+            }
+        }
         
+        // ========== LIMITS FUNCTIONS ==========
         async function loadLimits() {
             try {
                 const response = await fetch('/api/limits');
@@ -427,9 +448,7 @@
                 topicFilterEnabled = limits.topicFilterEnabled;
                 updateTopicFilterToggle();
                 displayLimits();
-            } catch(e) { 
-                console.error('Failed to load limits', e);
-            }
+            } catch(e) { console.error('Failed to load limits', e); }
         }
         
         async function saveLimits() {
@@ -440,7 +459,6 @@
                 dailyQuota: parseInt(document.getElementById('dailyQuota').value),
                 topicFilterEnabled: topicFilterEnabled
             };
-            
             try {
                 const response = await fetch('/api/limits', {
                     method: 'POST',
@@ -449,14 +467,10 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    addMessage('bot', '✅ Limits saved successfully!');
+                    addMessage('bot', '✅ Limits saved!');
                     displayLimits();
-                } else {
-                    addMessage('bot', '❌ Failed to save limits');
                 }
-            } catch(e) { 
-                addMessage('bot', '❌ Error saving limits');
-            }
+            } catch(e) { addMessage('bot', '❌ Error saving limits'); }
         }
         
         function displayLimits() {
@@ -488,7 +502,6 @@
         }
         
         // ========== WEB SEARCH TOGGLE ==========
-        
         function updateWebSearchToggle() {
             const toggle = document.getElementById('webSearchToggle');
             if (webSearchEnabled) toggle.classList.add('active');
@@ -507,14 +520,12 @@
         }
         
         // ========== SETUP FUNCTIONS ==========
-        
         async function setupBot() {
             const websiteUrl = document.getElementById('websiteUrl').value;
             const personality = document.getElementById('personality').value;
             const safetyRules = document.getElementById('safetyRules').value;
             const styleRules = document.getElementById('styleRules').value;
             const statusDiv = document.getElementById('status');
-            
             statusDiv.innerHTML = '<div class="info-bg">⏳ Setting up...</div>';
             
             try {
@@ -526,31 +537,28 @@
                 const data = await response.json();
                 if (data.success) {
                     botReady = true;
-                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready with your custom rules!</div>';
+                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready!</div>';
                     document.getElementById('livePersonality').value = personality;
                     document.getElementById('liveSafety').value = safetyRules;
                     document.getElementById('liveStyle').value = styleRules;
-                    addMessage('bot', 'Setup complete! I am now following your custom personality, safety, and style rules.');
+                    addMessage('bot', 'Setup complete! Bot is ready.');
                     loadCurrentRules();
                 } else {
                     statusDiv.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
                 }
-            } catch(e) { 
-                statusDiv.innerHTML = '<div class="error-bg">❌ Connection error</div>';
-            }
+            } catch(e) { statusDiv.innerHTML = '<div class="error-bg">❌ Connection error</div>'; }
         }
         
         async function updateRulesOnly() {
             const personality = document.getElementById('livePersonality').value;
             const safetyRules = document.getElementById('liveSafety').value;
             const styleRules = document.getElementById('liveStyle').value;
-            
             await fetch('/api/update-rules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ personality, safetyRules, styleRules, webSearchEnabled })
             });
-            addMessage('bot', '✨ Rules updated! I will now follow your new instructions.');
+            addMessage('bot', '✨ Rules updated!');
             loadCurrentRules();
         }
         
@@ -567,12 +575,10 @@
         }
         
         // ========== CHAT FUNCTIONS ==========
-        
         async function sendMessage() {
             const input = document.getElementById('question');
             const question = input.value.trim();
             if (!question) return;
-            
             addMessage('user', question);
             input.value = '';
             addMessage('bot', '🤔 Thinking...');
@@ -590,7 +596,7 @@
             } catch(e) {
                 const messagesDiv = document.getElementById('messages');
                 messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', '❌ Error connecting to server');
+                addMessage('bot', '❌ Error');
             }
         }
         
@@ -604,18 +610,12 @@
         }
         
         // ========== INITIALIZE ==========
-        
-        // Pre-fill the setup panel with your rules (already in HTML, but ensure they're there)
-        document.getElementById('personality').value = defaultPersonality;
-        document.getElementById('safetyRules').value = defaultSafety;
-        document.getElementById('styleRules').value = defaultStyle;
-        
         updateChatLinkDisplay();
         loadLimits();
         loadCurrentRules();
-        
-        // Update chat link if URL changes
+        refreshAnalytics();
         setInterval(updateChatLinkDisplay, 1000);
+        setInterval(refreshAnalytics, 30000);
     </script>
 </body>
 </html>
