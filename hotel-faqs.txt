@@ -7,6 +7,10 @@ CHECK-OUT TIME | 11:00 AM
 WIFI PASSWORD | internet
 WIFI NETWORK | Vogelweiderhof
 
+ONLINE CHECK-IN | Link for Online-Check-in will be send automatically 3 days before Arrival date. The online-check-in is mandatory by law, and is also necessary to get the Guest Mobility Ticket
+
+GUEST MOBILITY TICKET Guest Mobility Ticket | Guest Mobility Ticket is free ticket for the whole Duration of the stay. It allows guest to use all public Transportation in Salzburg Province free of charge. During Online-Check-In make sure, to mark every one to receive the ticket.
+
 BREAKFAST HOURS | 7:00 AM - 10:00 AM daily
 BREAKFAST COST | €14 per adult, €10 per child, age 5-10 years.
 BREAKFAST LOCATION | Building A. byside the main street. 
@@ -17,11 +21,13 @@ ADRESS | Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg
 
 RECEPTION | Reception of Hotel is in Building B. which is in the Courtyard. 
 
+ROOM PRICE | Please use the "Booking Now" button on the Homepage to open the booking engine, there you can set Dates and see Prices and availability. We should Always be one of the most economical hotel in whole Salzburg. 
+
 
 PET RESTRICTIONS | Not pet alllowed.
 
 CANCELLATION POLICY | Cancellation Policy depending on the booked rate. But cancellation 1 days before Arrival date, or on Arrival date will Always incur the full 100% room Price as cancellation fee. 
-LATE CANCELLATION | 100% charge for no-show or cancellation within 48 hours
+LATE CANCELLATION | 100% charge for no-show or cancellation within 24 Hours, regardless of booked rate.
 
 
 PHONE NUMBER | +43 662 871223 (till 23pm)
