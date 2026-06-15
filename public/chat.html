@@ -40,7 +40,6 @@
             gap: 8px;
         }
         
-        /* Logo styling - using your uploaded logo */
         .hotel-logo {
             width: 60px;
             height: 60px;
@@ -93,6 +92,7 @@
             color: #333;
             border-bottom-left-radius: 4px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            white-space: pre-wrap;
         }
         
         .feedback-buttons {
@@ -178,21 +178,145 @@
             font-style: italic;
         }
         
+        /* Floating Bus Timer Overlay */
+        .bus-overlay {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 280px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            border: 1px solid #E8DCC8;
+        }
+        
+        .bus-overlay-header {
+            background: #3A5E3C;
+            color: white;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .bus-overlay-header .toggle-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        
+        .bus-overlay-content {
+            padding: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: block;
+        }
+        
+        .bus-overlay-content.collapsed {
+            display: none;
+        }
+        
+        .bus-line {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .bus-line h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #3A5E3C;
+        }
+        
+        .bus-departure {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 13px;
+            border-bottom: 1px dashed #f0f0f0;
+        }
+        
+        .bus-time {
+            font-weight: bold;
+            color: #D4A373;
+            font-size: 16px;
+        }
+        
+        .bus-direction {
+            color: #666;
+            font-size: 12px;
+            flex: 1;
+            text-align: right;
+            margin-left: 10px;
+        }
+        
+        .bus-delay {
+            color: #e74c3c;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        
+        .bus-last-updated {
+            font-size: 10px;
+            color: #999;
+            text-align: center;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+        
+        .refresh-btn {
+            background: #D4A373;
+            border: none;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+        }
+        
+        .refresh-btn:hover {
+            background: #c49162;
+        }
+        
+        .loading-bus {
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            padding: 10px;
+        }
+        
         @media (max-width: 600px) {
             body { padding: 0; }
             .chat-container { height: 100vh; border-radius: 0; max-width: 100%; }
             .bubble { max-width: 85%; font-size: 15px; }
+            .bus-overlay { width: 260px; bottom: 10px; right: 10px; }
         }
     </style>
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <!-- YOUR LOGO - loaded from images folder -->
-            <img src="/images/logo.png" class="hotel-logo" alt="Hotel Vogelweiderhof Logo">
-            
+            <img src="/images/logo.png" class="hotel-logo" alt="Hotel Vogelweiderhof Logo" 
+                 onerror="this.style.display='none'; this.nextSibling.style.display='flex';"
+                 style="display: block;">
+            <div style="width: 60px; height: 60px; background: #D4A373; border-radius: 50%; display: none; align-items: center; justify-content: center; margin-bottom: 5px;">
+                <span style="font-size: 30px;">🏨</span>
+            </div>
             <h1>Hotel Vogelweiderhof</h1>
-            <p>⭐ Economical comfort in Salzburg City | 🇬🇧 🇩🇪 🇪🇸 🇫🇷 🇮🇹 🇨🇳</p>
+            <p>Economical comfort in Salzburg City</p>
         </div>
         
         <div class="messages" id="messages">
@@ -203,7 +327,7 @@
                     • Check-in/out times<br>
                     • WiFi password<br>
                     • Breakfast hours & cost<br>
-                    • Parking & pool<br>
+                    • Parking<br>
                     • Local restaurants, weather & directions<br>
                     • And more!<br><br>
                     <strong>🌍 Just ask in your language!</strong>
@@ -221,14 +345,30 @@
         </div>
         
         <div class="input-area">
-            <input type="text" id="question" placeholder="Type your question... / 输入您的问题..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <input type="text" id="question" placeholder="Type your question... / Geben Sie Ihre Frage ein..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button onclick="sendMessage()">Send</button>
         </div>
         <div id="typing" class="typing" style="display: none;">🤖 Assistant is typing...</div>
     </div>
     
+    <!-- Floating Bus Timer Overlay -->
+    <div class="bus-overlay" id="busOverlay">
+        <div class="bus-overlay-header" onclick="toggleBusOverlay()">
+            <span>🚌 Live Bus Times from Hotel</span>
+            <button class="toggle-btn" id="toggleBtn">−</button>
+        </div>
+        <div class="bus-overlay-content" id="busOverlayContent">
+            <div id="busTimes">
+                <div class="loading-bus">Loading bus times...</div>
+            </div>
+            <button class="refresh-btn" onclick="fetchLiveBusTimes()">🔄 Refresh</button>
+            <div class="bus-last-updated" id="lastUpdated">Last updated: --:--:--</div>
+        </div>
+    </div>
+    
     <script>
         let botReady = false;
+        let busUpdateInterval = null;
         
         async function initialize() {
             try {
@@ -332,7 +472,181 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        initialize();
+        // ========== FLOATING BUS OVERLAY FUNCTIONS ==========
+        
+        function toggleBusOverlay() {
+            const content = document.getElementById('busOverlayContent');
+            const toggleBtn = document.getElementById('toggleBtn');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggleBtn.textContent = '−';
+                fetchLiveBusTimes();
+            } else {
+                content.classList.add('collapsed');
+                toggleBtn.textContent = '+';
+            }
+        }
+        
+        function extractDepartureTimes(text) {
+            const times = [];
+            const lines = text.split('\n');
+            let currentDirection = '';
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Check for direction headers
+                if (line.includes('Richtung Stadtzentrum') || line.includes('Towards City Center')) {
+                    currentDirection = 'City Center';
+                } else if (line.includes('Richtung Hauptbahnhof') || line.includes('Towards Hauptbahnhof') || line.includes('Train Station')) {
+                    currentDirection = 'Train Station';
+                } else if (line.includes('Andere Richtungen') || line.includes('Other directions')) {
+                    currentDirection = '';
+                } else if (line.includes('Bergheim') || line.includes('back to hotel')) {
+                    currentDirection = 'Back to Hotel';
+                }
+                
+                // Match time patterns
+                const timeMatch = line.match(/(\d{2}:\d{2})/);
+                if (timeMatch) {
+                    const time = timeMatch[1];
+                    let direction = currentDirection;
+                    let delay = '';
+                    
+                    // Extract delay
+                    const delayMatch = line.match(/\((\d+)\s*Min\s*Verspätung\)/i) || line.match(/\((\d+)\s*min\s*delay\)/i);
+                    if (delayMatch) delay = `${delayMatch[1]} min delay`;
+                    
+                    // Try to extract direction from line if not set
+                    if (!direction) {
+                        if (line.includes('Fürstenbrunn')) direction = 'City Center';
+                        else if (line.includes('Hauptbahnhof')) direction = 'Train Station';
+                        else if (line.includes('Bergheim')) direction = 'Back to Hotel';
+                        else if (line.includes('Pelting')) direction = 'To Hotel';
+                    }
+                    
+                    times.push({ time, direction: direction || 'Bus', delay });
+                }
+            }
+            
+            return times;
+        }
+        
+        async function fetchLiveBusTimes() {
+            const busTimesDiv = document.getElementById('busTimes');
+            if (!busTimesDiv) return;
+            
+            busTimesDiv.innerHTML = '<div class="loading-bus">Loading bus times...</div>';
+            
+            try {
+                // Fetch Bus 21 times
+                const bus21Response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userMessage: 'bus 21' })
+                });
+                const bus21Data = await bus21Response.json();
+                
+                // Fetch Bus 120 times
+                const bus120Response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userMessage: 'bus 120' })
+                });
+                const bus120Data = await bus120Response.json();
+                
+                const bus21Text = bus21Data.reply || '';
+                const bus120Text = bus120Data.reply || '';
+                
+                const bus21Times = extractDepartureTimes(bus21Text);
+                const bus120Times = extractDepartureTimes(bus120Text);
+                
+                let html = '';
+                
+                // Bus 21 Section
+                html += '<div class="bus-line">';
+                html += '<h4>🚌 Bus 21 - City Center</h4>';
+                
+                const cityCenterTimes = bus21Times.filter(t => t.direction === 'City Center');
+                if (cityCenterTimes.length > 0) {
+                    for (const time of cityCenterTimes.slice(0, 6)) {
+                        html += `<div class="bus-departure">
+                                    <span class="bus-time">${time.time}</span>
+                                    <span class="bus-direction">City Center</span>
+                                    ${time.delay ? `<span class="bus-delay">${time.delay}</span>` : ''}
+                                 </div>`;
+                    }
+                } else if (bus21Times.length > 0) {
+                    for (const time of bus21Times.slice(0, 6)) {
+                        html += `<div class="bus-departure">
+                                    <span class="bus-time">${time.time}</span>
+                                    <span class="bus-direction">${time.direction}</span>
+                                    ${time.delay ? `<span class="bus-delay">${time.delay}</span>` : ''}
+                                 </div>`;
+                    }
+                } else {
+                    html += '<div class="bus-departure">No upcoming departures found</div>';
+                }
+                html += '</div>';
+                
+                // Bus 120 Section
+                html += '<div class="bus-line">';
+                html += '<h4>🚌 Bus 120 - Train Station</h4>';
+                
+                const trainStationTimes = bus120Times.filter(t => t.direction === 'Train Station');
+                if (trainStationTimes.length > 0) {
+                    for (const time of trainStationTimes.slice(0, 6)) {
+                        html += `<div class="bus-departure">
+                                    <span class="bus-time">${time.time}</span>
+                                    <span class="bus-direction">Train Station</span>
+                                    ${time.delay ? `<span class="bus-delay">${time.delay}</span>` : ''}
+                                 </div>`;
+                    }
+                } else if (bus120Times.length > 0) {
+                    for (const time of bus120Times.slice(0, 6)) {
+                        html += `<div class="bus-departure">
+                                    <span class="bus-time">${time.time}</span>
+                                    <span class="bus-direction">${time.direction}</span>
+                                    ${time.delay ? `<span class="bus-delay">${time.delay}</span>` : ''}
+                                 </div>`;
+                    }
+                } else {
+                    html += '<div class="bus-departure">No upcoming departures found</div>';
+                }
+                html += '</div>';
+                
+                busTimesDiv.innerHTML = html;
+                
+                // Update last updated time
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString();
+                const lastUpdatedElem = document.getElementById('lastUpdated');
+                if (lastUpdatedElem) {
+                    lastUpdatedElem.innerHTML = `Last updated: ${timeStr}`;
+                }
+                
+            } catch (error) {
+                console.error('Error fetching bus times:', error);
+                busTimesDiv.innerHTML = '<div class="loading-bus">Error loading bus times. Please refresh.</div>';
+            }
+        }
+        
+        function initBusOverlay() {
+            fetchLiveBusTimes();
+            if (busUpdateInterval) clearInterval(busUpdateInterval);
+            busUpdateInterval = setInterval(fetchLiveBusTimes, 60000);
+        }
+        
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initialize();
+            initBusOverlay();
+        });
+        
+        window.addEventListener('beforeunload', function() {
+            if (busUpdateInterval) clearInterval(busUpdateInterval);
+        });
     </script>
 </body>
 </html>
