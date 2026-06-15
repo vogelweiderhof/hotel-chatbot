@@ -5,7 +5,7 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 
-// ÖBB API Integration
+// ÖBB API Integration with timeout
 let oebb = null;
 try {
     oebb = require('oebb-api');
@@ -29,31 +29,46 @@ app.use((req, res, next) => {
 const HOTEL_ADDRESS = "Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg";
 const NEAREST_BUS_STOP = "Baron Schwarz Park";
 
-// ========== ÖBB FUNCTIONS ==========
+// ========== ÖBB FUNCTIONS WITH TIMEOUTS ==========
 const stationCache = new Map();
 
-async function getStationId(stationName) {
+async function getStationId(stationName, timeoutMs = 3000) {
     if (!oebb) return null;
     if (stationCache.has(stationName)) return stationCache.get(stationName);
+    
     try {
-        const stations = await oebb.searchStationsNew(stationName);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Station search timeout')), timeoutMs)
+        );
+        const searchPromise = oebb.searchStationsNew(stationName);
+        const stations = await Promise.race([searchPromise, timeoutPromise]);
+        
         if (stations && stations.length > 0) {
             stationCache.set(stationName, stations[0]);
             return stations[0];
         }
-    } catch (error) { return null; }
+    } catch (error) {
+        console.error('Station search error:', error.message);
+    }
     return null;
 }
 
-async function getRealTimeDepartures(stationName) {
+async function getRealTimeDepartures(stationName, timeoutMs = 5000) {
     if (!oebb) return null;
     try {
-        const station = await getStationId(stationName);
+        const station = await getStationId(stationName, 2000);
         if (!station) return null;
+        
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Departures timeout')), timeoutMs)
+        );
+        
         const options = oebb.getStationBoardDataOptions();
         options.evaId = station.number;
-        options.maxJourneys = 5;
-        const departures = await oebb.getStationBoardData(options);
+        options.maxJourneys = 3;
+        
+        const departuresPromise = oebb.getStationBoardData(options);
+        const departures = await Promise.race([departuresPromise, timeoutPromise]);
         return departures;
     } catch (error) {
         console.error('Departures error:', error.message);
@@ -61,17 +76,26 @@ async function getRealTimeDepartures(stationName) {
     }
 }
 
-async function getJourney(fromStation, toStation) {
+async function getJourney(fromStation, toStation, timeoutMs = 8000) {
     if (!oebb) return null;
     try {
-        const from = await getStationId(fromStation);
-        const to = await getStationId(toStation);
+        const from = await getStationId(fromStation, 2000);
+        const to = await getStationId(toStation, 2000);
         if (!from || !to) return null;
-        const journeys = await oebb.getJourneys(from, to, false, new Date());
+        
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Journey timeout')), timeoutMs)
+        );
+        
+        const journeysPromise = oebb.getJourneys(from, to, false, new Date());
+        const journeys = await Promise.race([journeysPromise, timeoutPromise]);
+        
         if (journeys && journeys.connections && journeys.connections.length > 0) {
             return journeys.connections[0];
         }
-    } catch (error) { return null; }
+    } catch (error) {
+        console.error('Journey error:', error.message);
+    }
     return null;
 }
 
@@ -118,21 +142,11 @@ setInterval(() => {
 
 // ========== BOT CONFIGURATION ==========
 let botConfig = {
-    personality: `You are a helpful hotel front desk agent. You have access to three sources of information in this order:
-1. FAQ (highest priority - this is your hotel's official information)
-2. ÖBB API (real-time transport data - trains, buses, schedules)
-3. Web Search (weather, events, general information)
-
-When answering:
-- ALWAYS check the FAQ first. If the answer is there, use it.
-- If the FAQ doesn't have the answer and it's about transport (bus/train times, routes), use the ÖBB data.
-- If it's about weather, events, or local attractions, use web search.
-- Be concise and direct. Never start with "Great question!".
-- Never end responses with questions.`,
+    personality: `You are a helpful hotel front desk agent. Answer questions directly. Be concise. Never start with "Great question!". Never end responses with questions.`,
     
     safetyRules: `Never ask for credit card numbers. Never share other guests' data.`,
     
-    styleRules: `Use sentence case. Never use bold for passwords. Be direct and helpful.`,
+    styleRules: `Use sentence case. Be direct and helpful.`,
     
     websiteContent: "",
     customRules: [],
@@ -142,7 +156,7 @@ When answering:
 
 // ========== LIMITS ==========
 let limitsConfig = {
-    maxTokensPerResponse: 300,
+    maxTokensPerResponse: 250,
     maxMessagesPerSession: 20,
     maxQuestionsPerMinute: 10,
     dailyQuota: 500,
@@ -209,20 +223,19 @@ function loadFAQs() {
     } catch (error) { return "FAQ unavailable"; }
 }
 
-// ========== FUNCTION TO CHECK IF ANSWER EXISTS IN FAQ ==========
-function findAnswerInFAQ(question, faqContent) {
-    const lowerQuestion = question.toLowerCase();
-    const faqLines = faqContent.split('\n');
-    
-    for (const line of faqLines) {
-        if (line.includes('|') && !line.startsWith('#')) {
-            const [faqQuestion, faqAnswer] = line.split('|').map(s => s.trim());
-            if (lowerQuestion.includes(faqQuestion.toLowerCase()) || faqQuestion.toLowerCase().includes(lowerQuestion)) {
-                return { found: true, answer: faqAnswer };
-            }
-        }
-    }
-    return { found: false, answer: null };
+// ========== CHECK IF QUESTION NEEDS REAL-TIME DATA ==========
+function needsRealTimeData(question) {
+    const realTimePatterns = [
+        /next (bus|train|departure|connection)/i,
+        /when (does|is|will) (the|a) (bus|train)/i,
+        /what time (does|is) (the|a) (bus|train)/i,
+        /current (bus|train) (schedule|time|departure)/i,
+        /fahrplan/i,
+        /abfahrt/i,
+        /aktuell/i,
+        /live/i
+    ];
+    return realTimePatterns.some(pattern => pattern.test(question));
 }
 
 // ========== LANGUAGE DETECTION ==========
@@ -318,7 +331,7 @@ app.post('/api/chat', async (req, res) => {
     
     const faqContent = loadFAQs();
     let history = conversationMemory.get(clientIp) || [];
-    const historyText = history.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    const historyText = history.slice(-4).map(msg => `${msg.role}: ${msg.content}`).join('\n');
     
     let detectedLang = userLanguagePreference.get(clientIp);
     if (!detectedLang) {
@@ -327,52 +340,35 @@ app.post('/api/chat', async (req, res) => {
     }
     
     const isBookingQuestion = /book|price|cost|rate|availability/i.test(userQuestion);
-    const isTransportQuestion = /bus|train|tram|bahn|fahrplan|departure|abfahrt|when|what time|how to get|directions|route|hallstatt|salzburg/i.test(userQuestion);
-    const isWeatherQuestion = /weather|wetter|temp|temperature|rain|sunny|clouds/i.test(userQuestion);
+    const needsRealtime = needsRealTimeData(userQuestion);
+    const isHallstattQuestion = /hallstatt/i.test(userQuestion);
     
-    // STEP 1: Try to find answer in FAQ first
-    const faqMatch = findAnswerInFAQ(userQuestion, faqContent);
+    // Fetch real-time data if needed (with timeout to avoid slowness)
+    let realTimeData = "";
+    let apiUsed = false;
     
-    let oebbData = "";
-    let webSearchData = "";
-    
-    // STEP 2: If FAQ didn't have answer and it's a transport question, check ÖBB
-    if (!faqMatch.found && isTransportQuestion && oebb) {
-        console.log('🔍 FAQ had no answer - checking ÖBB API');
+    if (needsRealtime && oebb) {
+        console.log('🚆 Fetching real-time data for:', userQuestion);
+        apiUsed = true;
         
-        // Check for real-time departures
-        const departures = await getRealTimeDepartures("Salzburg Baron Schwarz Park");
+        // Try to get departures from Baron Schwarz Park
+        const departures = await getRealTimeDepartures("Salzburg Baron Schwarz Park", 4000);
         if (departures && departures.journey && departures.journey.length > 0) {
-            oebbData = "\n\n**Real-time departures from Baron Schwarz Park (nearest stop):**\n";
+            realTimeData = "\n\n**Real-time departures from Baron Schwarz Park (your nearest stop):**\n";
             for (let i = 0; i < Math.min(3, departures.journey.length); i++) {
                 const journey = departures.journey[i];
                 const delay = journey.rt?.dlm ? ` (${journey.rt.dlm} min delay)` : "";
-                oebbData += `• ${journey.pr} towards ${journey.st} at ${journey.ti}${delay}\n`;
+                realTimeData += `• ${journey.pr} towards ${journey.st || 'various'} at ${journey.ti}${delay}\n`;
             }
-        }
-        
-        // Check for Hallstatt journey
-        if (userQuestion.toLowerCase().includes('hallstatt')) {
-            const journey = await getJourney("Salzburg Hbf", "Hallstatt");
-            if (journey && journey.sections && journey.sections[0]) {
-                const section = journey.sections[0];
-                const duration = journey.duration ? Math.round(journey.duration / 60000) : "?";
-                oebbData += `\n\n**Current ÖBB train connection from Salzburg Hbf to Hallstatt:**\n• ${section.category?.name || 'Train'} ${section.category?.number || ''}\n• Departure: ${section.from?.departure?.substring(11, 16) || 'check schedule'}\n• Duration: about ${duration} minutes\n• At Hallstatt station, take the ferry across the lake.`;
-            }
+        } else {
+            realTimeData = "\n\n*Real-time data temporarily unavailable. Please check oebb.at for current schedules.*";
         }
     }
     
-    // STEP 3: Use web search for weather or general info
-    if (isWeatherQuestion && botConfig.webSearchEnabled) {
-        webSearchData = "\n\nUse web search to find current weather information for Salzburg.";
-    }
-    
-    const priorityInfo = [];
-    if (faqMatch.found) {
-        priorityInfo.push(`**FROM HOTEL FAQ (official - use this):**\n${faqMatch.answer}`);
-    }
-    if (oebbData) {
-        priorityInfo.push(`**FROM ÖBB API (real-time data):**${oebbData}`);
+    // For Hallstatt comparison question, add specific guidance
+    let hallstattGuidance = "";
+    if (isHallstattQuestion && userQuestion.toLowerCase().includes('better')) {
+        hallstattGuidance = "\n\n**For Hallstatt:** Train from Salzburg Hbf is generally faster and more reliable than bus. The bus requires changes (150 → 541 → 543) and takes longer.";
     }
     
     const languageInstructions = {
@@ -383,44 +379,45 @@ app.post('/api/chat', async (req, res) => {
     
     const systemPrompt = `You are a hotel assistant at Hotel Vogelweiderhof (Vogelweiderstraße 93/B, 5020 Salzburg).
 
-**INFORMATION PRIORITY (use in this order):**
-1. FIRST - Use the "FROM HOTEL FAQ" section if present. This is your hotel's official, correct information.
-2. SECOND - If no FAQ answer and the question is about transport, use the ÖBB data.
-3. THIRD - For weather, use web search.
+${realTimeData ? `**LIVE REAL-TIME DATA (use this for schedule questions):**${realTimeData}` : ''}
+${hallstattGuidance}
 
-${priorityInfo.length > 0 ? priorityInfo.join('\n') : 'No FAQ match found for this question. Use ÖBB data for transport or web search for weather.'}
+**IMPORTANT RULES:**
+- For "next train/bus" questions, use the REAL-TIME DATA above. Do NOT just tell guests to check oebb.at.
+- For route questions, use the FAQ below.
+- For "is bus or train better", give a clear recommendation based on speed and convenience.
+- Never end responses with questions.
+- Be direct and helpful.
+
+**BUS ROUTES FROM FAQ:**
+- Bus 21 goes to City Center (direction Fürstenbrunn). Bus 21 does NOT go to train station.
+- Bus 120 and 121 go to train station (direction Hauptbahnhof).
+- Nearest stop: "Baron Schwarz Park", 30 meters from hotel.
+
+**HALLSTATT ROUTE:**
+- From hotel: Bus 120/121 to Salzburg Hbf → Train to Attnang-Puchheim → Train to Hallstatt (2.5-3 hours)
+- Train from Salzburg Hbf is faster than bus. Bus requires changes (150→541→543).
 
 ${languageInstructions[detectedLang] || languageInstructions.english}
 
 PREVIOUS CONVERSATION:
 ${historyText || "None"}
 
-COMPLETE FAQ FOR REFERENCE (use only if FAQ match above is insufficient):
-${faqContent.substring(0, 2000)}
-
 GUEST: ${userQuestion}
 
-INSTRUCTIONS:
-- If the FAQ had an answer (shown above), use it. Do not override it with other sources.
-- For bus routes: Bus 21 goes to city center. Bus 120/121 go to train station. This is from your hotel's FAQ.
-- Be concise. Never start with "Great question!". Never end with questions.`;
+Answer concisely. Use the real-time data if available.`;
 
     try {
         const apiRequest = {
             model: "deepseek-chat",
             messages: [{ role: "user", content: systemPrompt }],
             temperature: 0.5,
-            max_tokens: limitsConfig.maxTokensPerResponse
+            max_tokens: 300
         };
-        
-        // Enable web search only for weather questions
-        if (botConfig.webSearchEnabled && isWeatherQuestion) {
-            apiRequest.search_enabled = true;
-        }
         
         const response = await axios.post('https://api.deepseek.com/v1/chat/completions', apiRequest, {
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            timeout: 30000
+            timeout: 20000
         });
         
         let reply = response.data.choices[0].message.content;
@@ -435,13 +432,13 @@ INSTRUCTIONS:
         
         history.push({ role: "user", content: userQuestion.substring(0, 150) });
         history.push({ role: "assistant", content: reply.substring(0, 300) });
-        if (history.length > 12) history.splice(0, 2);
+        if (history.length > 10) history.splice(0, 2);
         conversationMemory.set(clientIp, history);
         
         res.json({ reply: reply });
     } catch (error) {
         console.error('Chat error:', error.message);
-        res.json({ reply: "I'm having trouble right now. Please try again." });
+        res.json({ reply: "I'm having trouble connecting to the schedule service. Please check oebb.at for current train times." });
     }
 });
 
@@ -449,7 +446,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`📋 Priority: FAQ → ÖBB API → Web Search`);
-    console.log(`🚍 ÖBB Transport: ${oebb ? 'ENABLED' : 'Disabled'}`);
+    console.log(`🚍 ÖBB Transport: ${oebb ? 'ENABLED (with timeouts)' : 'Disabled'}`);
+    console.log(`⚡ Real-time detection: ON`);
     console.log(`🔍 Web Search: ${botConfig.webSearchEnabled ? 'ENABLED' : 'Disabled'}\n`);
 });
