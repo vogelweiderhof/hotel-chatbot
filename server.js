@@ -20,8 +20,8 @@ app.use((req, res, next) => {
 const HOTEL_ADDRESS = "Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg";
 const NEAREST_BUS_STOP = "Baron Schwarz Park";
 
-// ========== ÖBB API FOR REAL-TIME SCHEDULES ONLY ==========
-const OEBB_API_URL = "https://fahrplan.oebb.at/bin/mgate.exe";
+// ========== CORRECT ÖBB API (WORKS FOR ALL BUSES & TRAINS) ==========
+const OEBB_API_URL = "https://vao.demo.hafas.de/gate";
 
 function getCurrentDateTime() {
     const now = new Date();
@@ -40,15 +40,15 @@ function getCurrentDateTime() {
 async function findStation(stationName) {
     try {
         const requestBody = {
-            ver: "1.67",
-            lang: "en",
-            auth: { type: "AID", aid: "OWDL4fE4ixNiPBBm" },
-            client: { id: "OEBB", type: "WEB" },
             svcReqL: [{
-                req: { input: { loc: { name: stationName } }, field: "S" },
+                req: { input: { loc: { name: stationName }, field: "S" } },
                 meth: "LocMatch",
-                id: "1|1|1"
-            }]
+                id: "1|1|"
+            }],
+            client: { id: "VAO", v: "1", type: "AND", name: "nextgen" },
+            ver: "1.73",
+            lang: "en",
+            auth: { aid: "nextgen", type: "AID" }
         };
         
         const response = await axios.post(OEBB_API_URL, requestBody, {
@@ -57,15 +57,16 @@ async function findStation(stationName) {
         });
         
         const locations = response.data?.svcResL?.[0]?.res?.match?.locL || [];
-        if (locations.length > 0) {
+        if (locations && locations.length > 0) {
             return {
                 name: locations[0].name,
                 extId: locations[0].extId,
-                type: locations[0].type
+                type: locations[0].type || "S"
             };
         }
         return null;
     } catch (error) {
+        console.log("Station search error:", error.message);
         return null;
     }
 }
@@ -73,48 +74,54 @@ async function findStation(stationName) {
 async function getDepartures(stationName, maxDepartures = 5) {
     try {
         const station = await findStation(stationName);
-        if (!station) return null;
+        if (!station) {
+            console.log(`Station "${stationName}" not found`);
+            return null;
+        }
         
         const { date, time } = getCurrentDateTime();
         
         const requestBody = {
-            ver: "1.67",
-            lang: "en",
-            auth: { type: "AID", aid: "OWDL4fE4ixNiPBBm" },
-            client: { id: "OEBB", type: "WEB" },
             svcReqL: [{
                 req: {
-                    stbLoc: { type: station.type, extId: station.extId },
+                    stbLoc: { extId: station.extId, type: station.type },
                     type: "DEP",
                     maxJny: maxDepartures,
                     date: date,
                     time: time
                 },
                 meth: "StationBoard",
-                id: "1|1|1"
-            }]
+                id: "1|1|"
+            }],
+            client: { id: "VAO", v: "1", type: "AND", name: "nextgen" },
+            ver: "1.73",
+            lang: "en",
+            auth: { aid: "nextgen", type: "AID" }
         };
         
         const response = await axios.post(OEBB_API_URL, requestBody, {
-            timeout: 8000,
+            timeout: 10000,
             headers: { 'Content-Type': 'application/json' }
         });
         
         const journeys = response.data?.svcResL?.[0]?.res?.jnyL || [];
         const common = response.data?.svcResL?.[0]?.res?.common;
         
-        if (journeys.length === 0) return null;
+        if (!journeys.length) return null;
         
         return journeys.slice(0, maxDepartures).map(jny => {
             const prod = common?.prodL?.[jny.prodX];
+            const depTime = jny.stbStop?.dTimeS || "";
             return {
-                line: prod?.name || "Bus/Train",
+                line: prod?.name || prod?.line || "Bus/Train",
                 direction: jny.dirTxt || "",
-                departureTime: jny.stbStop?.dTimeS?.slice(0, 2) + ":" + jny.stbStop?.dTimeS?.slice(2, 4),
-                delay: jny.stbStop?.dTimeR ? parseInt(jny.stbStop.dTimeR) - parseInt(jny.stbStop.dTimeS) : 0
+                departureTime: depTime ? `${depTime.slice(0,2)}:${depTime.slice(2,4)}` : "--:--",
+                delay: jny.stbStop?.dTimeR ? parseInt(jny.stbStop.dTimeR) - parseInt(jny.stbStop.dTimeS) : 0,
+                platform: jny.stbStop?.dPltfS?.txt || ""
             };
         });
     } catch (error) {
+        console.log("ÖBB API error:", error.message);
         return null;
     }
 }
@@ -390,6 +397,8 @@ app.post('/api/chat', async (req, res) => {
                 const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : "";
                 realTimeData += `• ${dep.line} towards ${dep.direction} at ${dep.departureTime}${delayText}\n`;
             }
+        } else {
+            realTimeData = "\n\n**Real-time schedule unavailable.** Please check www.oebb.at for current departures.";
         }
     }
     
@@ -487,6 +496,6 @@ app.listen(PORT, () => {
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
     console.log(`🧠 Intent detection: ENABLED`);
     console.log(`📋 FAQ Priority: HIGH`);
-    console.log(`🚆 ÖBB API: Real-time schedules only`);
+    console.log(`🚆 ÖBB API: Real-time schedules only (UPDATED ENDPOINT)`);
     console.log(`🔍 Web Search: ${botConfig.webSearchEnabled ? 'ENABLED' : 'DISABLED'}\n`);
 });
