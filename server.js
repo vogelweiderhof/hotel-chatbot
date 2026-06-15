@@ -20,10 +20,9 @@ app.use((req, res, next) => {
 const HOTEL_ADDRESS = "Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg";
 const NEAREST_BUS_STOP = "Baron Schwarz Park";
 
-// ========== ÖBB DIRECT API CALLS ==========
+// ========== ÖBB API FOR REAL-TIME SCHEDULES ONLY ==========
 const OEBB_API_URL = "https://fahrplan.oebb.at/bin/mgate.exe";
 
-// Helper function to get current date/time in ÖBB format
 function getCurrentDateTime() {
     const now = new Date();
     const year = now.getFullYear();
@@ -40,18 +39,13 @@ function getCurrentDateTime() {
 
 async function findStation(stationName) {
     try {
-        const { date, time } = getCurrentDateTime();
-        
         const requestBody = {
             ver: "1.67",
             lang: "en",
             auth: { type: "AID", aid: "OWDL4fE4ixNiPBBm" },
             client: { id: "OEBB", type: "WEB" },
             svcReqL: [{
-                req: {
-                    input: { loc: { name: stationName } },
-                    field: "S"
-                },
+                req: { input: { loc: { name: stationName } }, field: "S" },
                 meth: "LocMatch",
                 id: "1|1|1"
             }]
@@ -67,14 +61,11 @@ async function findStation(stationName) {
             return {
                 name: locations[0].name,
                 extId: locations[0].extId,
-                type: locations[0].type,
-                x: locations[0].crd?.x,
-                y: locations[0].crd?.y
+                type: locations[0].type
             };
         }
         return null;
     } catch (error) {
-        console.error('Station search error:', error.message);
         return null;
     }
 }
@@ -82,10 +73,7 @@ async function findStation(stationName) {
 async function getDepartures(stationName, maxDepartures = 5) {
     try {
         const station = await findStation(stationName);
-        if (!station) {
-            console.log(`Station not found: ${stationName}`);
-            return null;
-        }
+        if (!station) return null;
         
         const { date, time } = getCurrentDateTime();
         
@@ -120,96 +108,13 @@ async function getDepartures(stationName, maxDepartures = 5) {
         return journeys.slice(0, maxDepartures).map(jny => {
             const prod = common?.prodL?.[jny.prodX];
             return {
-                line: prod?.name || prod?.prodCtx?.name || "Bus/Train",
+                line: prod?.name || "Bus/Train",
                 direction: jny.dirTxt || "",
                 departureTime: jny.stbStop?.dTimeS?.slice(0, 2) + ":" + jny.stbStop?.dTimeS?.slice(2, 4),
-                platform: jny.stbStop?.dPlatfS?.txt || jny.stbStop?.dPlatfR?.txt || "",
                 delay: jny.stbStop?.dTimeR ? parseInt(jny.stbStop.dTimeR) - parseInt(jny.stbStop.dTimeS) : 0
             };
         });
     } catch (error) {
-        console.error('Departures error:', error.message);
-        return null;
-    }
-}
-
-async function getJourney(fromStation, toStation) {
-    try {
-        const from = await findStation(fromStation);
-        const to = await findStation(toStation);
-        
-        if (!from || !to) {
-            console.log(`Could not find stations: ${fromStation} -> ${toStation}`);
-            return null;
-        }
-        
-        const { date, time } = getCurrentDateTime();
-        
-        const requestBody = {
-            ver: "1.67",
-            lang: "en",
-            auth: { type: "AID", aid: "OWDL4fE4ixNiPBBm" },
-            client: { id: "OEBB", type: "WEB" },
-            svcReqL: [{
-                req: {
-                    depLoc: { type: from.type, extId: from.extId },
-                    arrLoc: { type: to.type, extId: to.extId },
-                    date: date,
-                    time: time,
-                    searchForArrival: false,
-                    numF: 3
-                },
-                meth: "TripSearch",
-                id: "1|1|1"
-            }]
-        };
-        
-        const response = await axios.post(OEBB_API_URL, requestBody, {
-            timeout: 15000,
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const connections = response.data?.svcResL?.[0]?.res?.outConL || [];
-        if (connections.length === 0) return null;
-        
-        const conn = connections[0];
-        const common = response.data.svcResL[0].res.common;
-        
-        // Parse duration (format: HHMMSS in seconds)
-        const durationSec = parseInt(conn.dur);
-        const durationHours = Math.floor(durationSec / 3600);
-        const durationMins = Math.floor((durationSec % 3600) / 60);
-        
-        // Build leg information
-        const legs = [];
-        for (const section of conn.secL || []) {
-            if (section.type === "JNY" && section.jny) {
-                const prod = common?.prodL?.[section.jny.prodX];
-                const direction = common?.dirL?.[section.jny.dirX]?.txt;
-                legs.push({
-                    line: prod?.name || prod?.prodCtx?.name || "Train",
-                    direction: direction || "",
-                    from: common?.locL?.[section.jny.dep?.locX]?.name,
-                    to: common?.locL?.[section.jny.arr?.locX]?.name,
-                    departureTime: section.jny.dep?.dTimeS?.slice(0, 2) + ":" + section.jny.dep?.dTimeS?.slice(2, 4),
-                    arrivalTime: section.jny.arr?.aTimeS?.slice(0, 2) + ":" + section.jny.arr?.aTimeS?.slice(2, 4),
-                    departurePlatform: section.jny.dep?.dPltfS?.txt || section.jny.dep?.dPltfR?.txt,
-                    arrivalPlatform: section.jny.arr?.aPltfS?.txt || section.jny.arr?.aPltfR?.txt
-                });
-            }
-        }
-        
-        return {
-            from: common?.locL?.[conn.dep?.locX]?.name || fromStation,
-            to: common?.locL?.[conn.arr?.locX]?.name || toStation,
-            departureTime: conn.dep?.dTimeS?.slice(0, 2) + ":" + conn.dep?.dTimeS?.slice(2, 4),
-            arrivalTime: conn.arr?.aTimeS?.slice(0, 2) + ":" + conn.arr?.aTimeS?.slice(2, 4),
-            duration: `${durationHours}h ${durationMins}m`,
-            changes: conn.chg || 0,
-            legs: legs
-        };
-    } catch (error) {
-        console.error('Journey error:', error.message);
         return null;
     }
 }
@@ -257,11 +162,11 @@ setInterval(() => {
 
 // ========== BOT CONFIGURATION ==========
 let botConfig = {
-    personality: `You are a helpful hotel front desk agent. Answer questions directly. Be concise. Never start with "Great question!". Never end responses with questions.`,
+    personality: `You are a helpful hotel front desk agent. You understand what the guest really wants. For example, if they ask for a route, you provide the best option based on their preference (scenic vs fast).`,
     
     safetyRules: `Never ask for credit card numbers. Never share other guests' data.`,
     
-    styleRules: `Use sentence case. Be direct and helpful.`,
+    styleRules: `Use sentence case. Be direct, helpful, and warm. Never start with "Great question!". Never end responses with questions.`,
     
     websiteContent: "",
     customRules: [],
@@ -271,7 +176,7 @@ let botConfig = {
 
 // ========== LIMITS ==========
 let limitsConfig = {
-    maxTokensPerResponse: 300,
+    maxTokensPerResponse: 450,
     maxMessagesPerSession: 20,
     maxQuestionsPerMinute: 10,
     dailyQuota: 500,
@@ -338,20 +243,36 @@ function loadFAQs() {
     } catch (error) { return "FAQ unavailable"; }
 }
 
-// ========== CHECK IF QUESTION NEEDS REAL-TIME DATA ==========
+// ========== DETECT GUEST INTENT ==========
+function detectIntent(question) {
+    const lower = question.toLowerCase();
+    
+    if (lower.includes('hallstatt')) {
+        return 'hallstatt';
+    }
+    if (lower.includes('königssee') || lower.includes('koenigssee')) {
+        return 'koenigssee';
+    }
+    if (lower.includes('vienna') || lower.includes('wien')) {
+        return 'vienna';
+    }
+    if (lower.includes('salzburg') && (lower.includes('city center') || lower.includes('altstadt'))) {
+        return 'salzburg_city';
+    }
+    if (lower.includes('train station') || lower.includes('hauptbahnhof') || lower.includes('hbf')) {
+        return 'train_station';
+    }
+    if (/(next|when|what time).*(bus|train|departure)/i.test(question)) {
+        return 'schedule';
+    }
+    if (lower.includes('bus') || lower.includes('train')) {
+        return 'transport';
+    }
+    return 'general';
+}
+
 function needsRealTimeData(question) {
-    const realTimePatterns = [
-        /next (bus|train|departure|connection)/i,
-        /when (does|is|will) (the|a) (bus|train)/i,
-        /what time (does|is) (the|a) (bus|train)/i,
-        /current (bus|train) (schedule|time|departure)/i,
-        /fahrplan/i,
-        /abfahrt/i,
-        /live/i,
-        /schedule/i,
-        /departure/i
-    ];
-    return realTimePatterns.some(pattern => pattern.test(question));
+    return detectIntent(question) === 'schedule';
 }
 
 // ========== LANGUAGE DETECTION ==========
@@ -456,21 +377,12 @@ app.post('/api/chat', async (req, res) => {
     }
     
     const isBookingQuestion = /book|price|cost|rate|availability/i.test(userQuestion);
-    const needsRealtime = needsRealTimeData(userQuestion);
+    const intent = detectIntent(userQuestion);
+    const needsRealtime = intent === 'schedule';
     
-    // Detect destination for routing
-    const destinationMatch = userQuestion.match(/(to|from|towards|for)\s+([A-Za-z\s]+)/i);
-    let destination = destinationMatch ? destinationMatch[2].trim() : null;
-    if (!destination && (userQuestion.includes("Königssee") || userQuestion.includes("Hallstatt") || userQuestion.includes("Vienna") || userQuestion.includes("Salzburg"))) {
-        destination = userQuestion.match(/(Königssee|Hallstatt|Vienna|Wien|Salzburg|Berchtesgaden)/i)?.[0];
-    }
-    
-    // Fetch real-time data if needed
+    // Fetch real-time departures ONLY for schedule questions
     let realTimeData = "";
-    let journeyData = "";
-    
     if (needsRealtime) {
-        console.log('🚆 Fetching real-time departures...');
         const departures = await getDepartures("Salzburg Hbf", 5);
         if (departures && departures.length > 0) {
             realTimeData = "\n\n**Real-time departures from Salzburg Hbf:**\n";
@@ -478,47 +390,52 @@ app.post('/api/chat', async (req, res) => {
                 const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : "";
                 realTimeData += `• ${dep.line} towards ${dep.direction} at ${dep.departureTime}${delayText}\n`;
             }
-        } else {
-            realTimeData = "\n\n*Real-time data temporarily unavailable. Please check oebb.at for current schedules.*";
-        }
-    }
-    
-    // Fetch journey if destination detected
-    if (destination) {
-        console.log(`🚆 Fetching journey from Salzburg Hbf to ${destination}...`);
-        const journey = await getJourney("Salzburg Hbf", destination);
-        if (journey) {
-            journeyData = `\n\n**Connection from Salzburg Hbf to ${destination}:**\n`;
-            journeyData += `• Departure: ${journey.departureTime}\n`;
-            journeyData += `• Arrival: ${journey.arrivalTime}\n`;
-            journeyData += `• Duration: ${journey.duration}\n`;
-            journeyData += `• Changes: ${journey.changes}\n`;
-            if (journey.legs.length > 0) {
-                journeyData += `• Route: ${journey.legs.map(l => `${l.line} ${l.direction ? `(${l.direction})` : ''}`).join(' → ')}\n`;
-            }
-        } else {
-            journeyData = `\n\n*Could not find a connection to ${destination}. Please check the destination name or use oebb.at for routing.*`;
         }
     }
     
     const languageInstructions = {
-        english: "RESPOND IN ENGLISH. Be concise and direct.",
+        english: "RESPOND IN ENGLISH. Be direct and helpful.",
         german: "ANTWORTE AUF DEUTSCH. Seien Sie direkt und hilfreich.",
         chinese: "用中文回复。简洁直接。"
     };
     
     const systemPrompt = `You are a hotel assistant at Hotel Vogelweiderhof (Vogelweiderstraße 93/B, 5020 Salzburg).
 
-${realTimeData ? `**LIVE SCHEDULES (use this for schedule questions):**${realTimeData}` : ''}
-${journeyData ? `**ROUTING INFORMATION (use this for directions):**${journeyData}` : ''}
+**HOTEL FAQ (OFFICIAL INFORMATION - USE THIS FOR ALL ROUTES):**
+${faqContent}
 
-**BUS ROUTES FROM HOTEL FAQ (use for which bus to take):**
-- Bus 21 goes to City Center (direction Fürstenbrunn). Bus 21 does NOT go to train station.
-- Bus 120 and 121 go to train station (direction Hauptbahnhof).
-- Nearest stop: "Baron Schwarz Park", 30 meters from hotel.
+**INTENT DETECTED:** ${intent}
 
-**HALLSTATT ROUTE:**
-- From hotel: Bus 120/121 to Salzburg Hbf → Train to Attnang-Puchheim → Train to Hallstatt (2.5-3 hours)
+**SPECIFIC ROUTING INSTRUCTIONS:**
+
+1. **HALLSTATT ROUTE (from FAQ - USE THIS):**
+   - There is NO direct connection from Salzburg to Hallstatt (neither bus nor train)
+   - BUS ROUTE (scenic, better views): Bus 150 → change to Bus 541 → change to Bus 543 at "Hallstatt Gosaumühle" → Bus 543 stops at "Hallstatt Lahn" (directly at the lake)
+   - TRAIN ROUTE (faster): Train to Attnang-Puchheim → change to Hallstatt train → then take ferry across lake
+   - Guest Mobility Ticket valid to Bad Ischl only
+   - When asked "is there a direct bus/train", answer: "There is no direct connection, but..."
+   - When asked about scenic vs fast, explain both options clearly
+
+2. **KÖNIGSSEE ROUTE:**
+   - No direct connection from Salzburg
+   - Take train to Berchtesgaden Hbf, then bus 841 to Königssee
+
+3. **SALZBURG CITY CENTER:**
+   - From hotel: Bus 21 from Baron Schwarz Park (direction Fürstenbrunn)
+   - Walking: 30-45 minutes
+
+4. **TRAIN STATION (Salzburg Hbf):**
+   - From hotel: Bus 120 or 121 from Baron Schwarz Park (direction Hauptbahnhof)
+
+5. **REAL-TIME SCHEDULES:**
+   ${realTimeData || "Use this section only if user asks for 'next train' or 'when is the next bus'"}
+
+**CRITICAL RULES:**
+- If the user asks "is there a direct bus/train to X", first say "There is no direct connection" THEN provide the best option
+- For Hallstatt, explain BOTH bus (scenic) and train (faster) options
+- Never say something doesn't exist if your FAQ describes it
+- Never end responses with questions
+- Be warm and helpful
 
 ${languageInstructions[detectedLang] || languageInstructions.english}
 
@@ -527,14 +444,14 @@ ${historyText || "None"}
 
 GUEST: ${userQuestion}
 
-Answer concisely. Use the live schedule data for "next train" questions. Never end responses with questions.`;
+Remember: Understand what the guest really wants. If they ask for a route, provide the best option. If they ask about direct connections, be honest that none exist, then provide alternatives.`;
 
     try {
         const apiRequest = {
             model: "deepseek-chat",
             messages: [{ role: "user", content: systemPrompt }],
-            temperature: 0.5,
-            max_tokens: 350
+            temperature: 0.6,
+            max_tokens: limitsConfig.maxTokensPerResponse
         };
         
         const response = await axios.post('https://api.deepseek.com/v1/chat/completions', apiRequest, {
@@ -560,7 +477,7 @@ Answer concisely. Use the live schedule data for "next train" questions. Never e
         res.json({ reply: reply });
     } catch (error) {
         console.error('Chat error:', error.message);
-        res.json({ reply: "I'm having trouble connecting to the schedule service. Please check oebb.at for current train times." });
+        res.json({ reply: "I'm having trouble right now. Please try again." });
     }
 });
 
@@ -568,6 +485,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`🚆 ÖBB API: Direct integration (no external package)`);
+    console.log(`🧠 Intent detection: ENABLED`);
+    console.log(`📋 FAQ Priority: HIGH`);
+    console.log(`🚆 ÖBB API: Real-time schedules only`);
     console.log(`🔍 Web Search: ${botConfig.webSearchEnabled ? 'ENABLED' : 'DISABLED'}\n`);
 });
