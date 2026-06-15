@@ -5,20 +5,19 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 
-// ÖBB API Integration (optional - will work without it)
+// ÖBB API Integration (optional)
 let oebb = null;
 try {
     oebb = require('oebb-api');
-    console.log('✅ ÖBB API loaded successfully');
+    console.log('✅ ÖBB API loaded');
 } catch (error) {
-    console.log('⚠️ ÖBB API not available - using web search for transport queries');
+    console.log('⚠️ ÖBB API not available');
 }
 
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-// CORS headers
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -30,10 +29,9 @@ app.use((req, res, next) => {
 const HOTEL_ADDRESS = "Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg, Austria";
 const HOTEL_STATION = "Salzburg Vogelweiderstraße";
 
-// Cache for station searches
 const stationCache = new Map();
 
-// ========== ÖBB API FUNCTIONS (with null checks) ==========
+// ========== ÖBB FUNCTIONS ==========
 async function getStationId(stationName) {
     if (!oebb) return null;
     if (stationCache.has(stationName)) return stationCache.get(stationName);
@@ -43,48 +41,26 @@ async function getStationId(stationName) {
             stationCache.set(stationName, stations[0]);
             return stations[0];
         }
-    } catch (error) {
-        console.error('Station search error:', error.message);
-    }
+    } catch (error) { return null; }
     return null;
 }
 
-async function getJourney(fromStation, toStation, addOffers = false) {
+async function getJourney(fromStation, toStation) {
     if (!oebb) return null;
     try {
         const from = await getStationId(fromStation);
         const to = await getStationId(toStation);
         if (!from || !to) return null;
-        const date = new Date();
-        const journeys = await oebb.getJourneys(from, to, addOffers, date);
+        const journeys = await oebb.getJourneys(from, to, false, new Date());
         if (journeys && journeys.connections && journeys.connections.length > 0) {
             return journeys.connections[0];
         }
-    } catch (error) {
-        console.error('Journey error:', error.message);
-    }
-    return null;
-}
-
-async function getDepartures(stationName, minutesAhead = 60) {
-    if (!oebb) return null;
-    try {
-        const station = await getStationId(stationName);
-        if (!station) return null;
-        const options = oebb.getStationBoardDataOptions();
-        options.evaId = station.number;
-        options.maxJourneys = 5;
-        const departures = await oebb.getStationBoardData(options);
-        return departures;
-    } catch (error) {
-        console.error('Departures error:', error.message);
-    }
+    } catch (error) { return null; }
     return null;
 }
 
 function isPublicTransportQuestion(question) {
-    const transportKeywords = /bus|train|tram|sbahn|s-bahn|ubahn|u-bahn|bahn|station|haltestelle|fahrplan|schedule|departure|abfahrt|ankunft|arrival|verbindung|connection|wie komme ich|how to get|öffentliche verkehrsmittel|public transport|oebb|öbb/i;
-    return transportKeywords.test(question);
+    return /bus|train|tram|sbahn|s-bahn|ubahn|u-bahn|bahn|station|haltestelle|fahrplan|how to get|public transport|oebb|öbb/i.test(question);
 }
 
 // ========== CONVERSATION MEMORY ==========
@@ -97,21 +73,20 @@ let cachedFAQ = null;
 let lastFAQModified = 0;
 const FAQ_PATH = path.join(__dirname, 'hotel-faqs.txt');
 
-// ========== TOKEN & ANALYTICS TRACKING ==========
+// ========== ANALYTICS ==========
 const analytics = {
     totalQuestions: 0,
     totalTokensUsed: 0,
     totalPromptTokens: 0,
     totalCompletionTokens: 0,
     estimatedCostUSD: 0,
-    questionsByLanguage: { english: 0, german: 0, spanish: 0, french: 0, italian: 0, chinese: 0, dutch: 0, japanese: 0, korean: 0, other: 0 },
-    questionsByCategory: { hotel: 0, transport: 0, local: 0, booking: 0, help: 0, other: 0 },
+    questionsByLanguage: { english: 0, german: 0, spanish: 0, french: 0, italian: 0, chinese: 0 },
+    questionsByCategory: { hotel: 0, transport: 0, local: 0, booking: 0, conversation: 0, other: 0 },
     mostAskedQuestions: new Map(),
-    tokenUsageByCategory: { hotel: 0, transport: 0, local: 0, booking: 0, help: 0, other: 0 },
+    tokenUsageByCategory: { hotel: 0, transport: 0, local: 0, booking: 0, conversation: 0, other: 0 },
     webSearchUsage: 0,
     blockedQuestions: 0,
     dailyActiveSessions: new Set(),
-    dailyDates: new Map(),
     startTime: Date.now(),
     tokenHistory: []
 };
@@ -120,70 +95,48 @@ const COST_PER_MILLION_TOKENS = 0.20;
 
 function updateTokenAnalytics(usage, category) {
     if (!usage) return;
-    const promptTokens = usage.prompt_tokens || 0;
-    const completionTokens = usage.completion_tokens || 0;
     const totalTokens = usage.total_tokens || 0;
     analytics.totalTokensUsed += totalTokens;
-    analytics.totalPromptTokens += promptTokens;
-    analytics.totalCompletionTokens += completionTokens;
+    analytics.totalPromptTokens += usage.prompt_tokens || 0;
+    analytics.totalCompletionTokens += usage.completion_tokens || 0;
     if (category && analytics.tokenUsageByCategory[category] !== undefined) {
         analytics.tokenUsageByCategory[category] += totalTokens;
-    } else {
-        analytics.tokenUsageByCategory.other += totalTokens;
     }
     const cost = (totalTokens / 1000000) * COST_PER_MILLION_TOKENS;
     analytics.estimatedCostUSD += cost;
-    analytics.tokenHistory.push({
-        timestamp: new Date().toISOString(),
-        totalTokens,
-        promptTokens,
-        completionTokens,
-        category,
-        cost: cost.toFixed(6)
-    });
+    analytics.tokenHistory.push({ timestamp: new Date().toISOString(), totalTokens, category, cost: cost.toFixed(6) });
     if (analytics.tokenHistory.length > 100) analytics.tokenHistory.shift();
 }
 
 function getTokenAnalyticsSummary() {
     return {
         totalTokens: analytics.totalTokensUsed,
-        totalPromptTokens: analytics.totalPromptTokens,
-        totalCompletionTokens: analytics.totalCompletionTokens,
         estimatedCostUSD: analytics.estimatedCostUSD.toFixed(4),
         averageTokensPerQuestion: analytics.totalQuestions > 0 ? (analytics.totalTokensUsed / analytics.totalQuestions).toFixed(0) : 0,
-        tokenUsageByCategory: analytics.tokenUsageByCategory,
-        recentTokenUsage: analytics.tokenHistory.slice(-10)
+        tokenUsageByCategory: analytics.tokenUsageByCategory
     };
 }
 
-// Save analytics every hour
 setInterval(() => {
     const topQuestions = Array.from(analytics.mostAskedQuestions.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
+        .sort((a, b) => b[1] - a[1]).slice(0, 10)
         .map(([q, c]) => ({ question: q.substring(0, 100), count: c }));
-    const tokenSummary = getTokenAnalyticsSummary();
-    const stats = {
+    fs.writeFileSync(path.join(__dirname, 'analytics.json'), JSON.stringify({
         totalQuestions: analytics.totalQuestions,
         questionsByLanguage: analytics.questionsByLanguage,
         questionsByCategory: analytics.questionsByCategory,
         topQuestions: topQuestions,
-        webSearchUsage: analytics.webSearchUsage,
-        blockedQuestions: analytics.blockedQuestions,
-        activeSessionsToday: analytics.dailyActiveSessions.size,
-        uptimeHours: ((Date.now() - analytics.startTime) / 3600000).toFixed(1),
-        tokenAnalytics: tokenSummary
-    };
-    fs.writeFileSync(path.join(__dirname, 'analytics.json'), JSON.stringify(stats, null, 2));
+        tokenAnalytics: getTokenAnalyticsSummary()
+    }, null, 2));
 }, 3600000);
 
-// ========== CONVERSATIONAL BOT RULES ==========
+// ========== BOT CONFIGURATION (Fixed - No repetition, no ending questions) ==========
 let botConfig = {
-    personality: `You are a friendly, warm, and conversational hotel front desk agent. Have a natural, back-and-forth conversation with guests. Be helpful but not robotic. Use casual, friendly language. Smile in your responses. Use phrases like "Of course!", "Happy to help!", "Great question!" occasionally. Keep responses concise but warm. Never be abrupt or short. Acknowledge follow-up questions naturally. If a guest asks for confirmation (like "just internet?"), respond warmly like "That's right! Just 'internet' - nice and simple." Never block or reject a follow-up question. Be conversational and helpful.`,
+    personality: `You are a friendly, efficient hotel front desk agent. Answer questions directly and conversationally. Be helpful and warm, but don't use repetitive phrases like "Great question!" or "That's a wonderful question!" - just answer naturally. Never start responses with the same phrase repeatedly. Vary your language. Be concise but friendly. Use occasional emojis (😊) but no more than one per message. Never end your response with a question - make statements, not questions.`,
     
-    safetyRules: `Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never share other guests' data. If uncertain about an answer, say so honestly. Block abusive language with one neutral warning.`,
+    safetyRules: `Never ask for credit card numbers or passwords. Redirect to secure booking engine for payments. Never share other guests' data. Block abusive language with one neutral warning.`,
     
-    styleRules: `Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines. Use bullet points for lists. **NEVER use bold for passwords, codes, or credentials.** Write dates in clear format like "24 May, 2026". Show prices with currency symbol followed by "per night" or "total." Use natural, conversational language. Be warm and friendly. Use occasional emojis sparingly (😊, 👍, 🏨). Keep responses concise but complete. Never end a conversation abruptly. Always leave the door open for follow-up questions.`,
+    styleRules: `Use sentence case only. Never use ALL CAPS. Break text into short lines. NEVER use bold for passwords. Write dates as "24 May, 2026". Show prices with € symbol. Use at most one emoji per message. Never end responses with a question mark. End with periods. Be direct but friendly.`,
     
     websiteContent: "",
     customRules: [],
@@ -191,7 +144,7 @@ let botConfig = {
     webSearchEnabled: true
 };
 
-// ========== LIMITS CONFIGURATION ==========
+// ========== LIMITS ==========
 let limitsConfig = {
     maxTokensPerResponse: 200,
     maxMessagesPerSession: 20,
@@ -202,76 +155,65 @@ let limitsConfig = {
 
 const usageTracker = new Map();
 
-// ========== EXPANDED TOPIC FILTER ==========
-const ALLOWED_TOPICS = {
-    hotel: /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room service|laundry|smoking|room type|bed|bathroom|amenities|address|location|street|where are you|hotel address/i,
-    
-    conversational: /^(just|only|really|so|ok|okay|thanks|thank you|great|perfect|got it|i see|ah|oh|hmm|yes|no|yeah|sure|right|correct|exactly)$/i,
-    confirmation: /(just|only|really)\?$|is that (all|it|correct)|so that's it|that's all|nothing else/i,
-    
-    transport: /how to get|directions|get to|go to|way to|from hotel to|travel to|reach|taxi|bus|train|tram|subway|metro|shuttle|walk|drive|bike|public transport/i,
-    
-    local: /weather|restaurant|bar|cafe|attraction|museum|airport|station|city center|old town|downtown|nearby|local|sightseeing|thing to do|salzburg|vienna|what to see|what to do/i,
-    
-    booking: /availability|available|book|booking|price|cost|rate|how much|what.*price/i,
-    
-    help: /help|assist|support|what can you do|how do you work/i
-};
-
-const BLOCKED_TOPICS = {
-    politics: /politics|election|president|government|trump|biden|putin|ukraine|war|military/i,
-    adult: /sex|porn|naked|hookup|escort|adult/i,
-    violence: /violence|violent|fight|kill|murder|weapon|gun|bomb|attack/i
-};
-
-function detectCategory(question) {
-    const lowerQuestion = question.toLowerCase();
-    for (const [category, pattern] of Object.entries(ALLOWED_TOPICS)) {
-        if (pattern.test(lowerQuestion)) return category;
-    }
-    return 'other';
-}
-
-function isQuestionAllowed(question) {
+// ========== PERMISSIVE TOPIC FILTER ==========
+function isQuestionAllowed(question, conversationHistory) {
     if (!limitsConfig.topicFilterEnabled) return { allowed: true, reason: null };
+    
     const lowerQuestion = question.toLowerCase();
     
-    // Always allow short confirmations and thanks
-    if (lowerQuestion.match(/^(ok|okay|thanks|thank you|great|perfect|got it|i see|yes|no|yeah|sure|right)$/i)) {
+    // ALWAYS allow short questions (under 30 chars) - these are likely follow-ups
+    if (question.length < 30) {
         return { allowed: true, reason: null };
     }
     
-    // Allow confirmation questions like "just internet?"
-    if (lowerQuestion.match(/(just|only|really)\?$/)) {
-        return { allowed: true, reason: null };
-    }
+    // ALWAYS allow conversational follow-ups
+    const conversationalPatterns = [
+        /^(just|only|really|so|ok|thanks|thank you|great|perfect|got it|i see|ah|oh|yes|no|yeah|sure|right|wait|one more|actually)$/i,
+        /(just|only|really)\?$/,
+        /is that (all|it|correct|right)/i,
+        /so that'?s it/i,
+        /that'?s all/i,
+        /what about/i,
+        /how about/i,
+        /and what/i,
+        /also/i,
+        /by the way/i,
+        /one more thing/i
+    ];
     
-    for (const [topic, pattern] of Object.entries(BLOCKED_TOPICS)) {
+    for (const pattern of conversationalPatterns) {
         if (pattern.test(lowerQuestion)) {
-            analytics.blockedQuestions++;
-            return { allowed: false, reason: `I'm here to help with hotel and travel questions only.` };
+            analytics.questionsByCategory.conversation++;
+            return { allowed: true, reason: null };
         }
     }
     
-    let isAllowed = false;
-    for (const [category, pattern] of Object.entries(ALLOWED_TOPICS)) {
-        if (pattern.test(lowerQuestion)) {
-            isAllowed = true;
-            analytics.questionsByCategory[category]++;
-            break;
+    // Check if this follows a recent hotel-related question (context)
+    if (conversationHistory && conversationHistory.length > 0) {
+        const lastBotResponse = conversationHistory.slice(-2).find(m => m.role === 'assistant')?.content || '';
+        const hotelKeywords = /wifi|internet|password|check-in|check-out|breakfast|parking|pool|room|address/;
+        if (hotelKeywords.test(lastBotResponse)) {
+            analytics.questionsByCategory.conversation++;
+            return { allowed: true, reason: null };
         }
     }
     
-    if (lowerQuestion.length < 5 && !isAllowed) {
-        analytics.questionsByCategory.help++;
-        return { allowed: true, reason: null };
-    }
-    
-    if (!isAllowed) {
-        analytics.questionsByCategory.other++;
+    // Check against blocked topics
+    const blockedPatterns = /politics|election|president|government|trump|biden|putin|ukraine|war|sex|porn|naked|violence|violent|fight|kill|murder|weapon|gun|bomb|attack/i;
+    if (blockedPatterns.test(lowerQuestion)) {
         analytics.blockedQuestions++;
-        return { allowed: false, reason: "I'm a hotel assistant. I can help with check-in/out times, WiFi, breakfast, local restaurants, weather, attractions, directions, and the hotel address. What would you like to know? 😊" };
+        return { allowed: false, reason: "I can only help with hotel and travel questions." };
     }
+    
+    // Check if it's hotel-related
+    const hotelPatterns = /check[-\s]?in|check[-\s]?out|wifi|breakfast|parking|pool|pet|cancellation|reception|room|address|location|directions|how to get|taxi|bus|train|weather|restaurant|attraction|old town|city center|salzburg|book|price|cost/i;
+    
+    if (hotelPatterns.test(lowerQuestion)) {
+        analytics.questionsByCategory.hotel++;
+        return { allowed: true, reason: null };
+    }
+    
+    analytics.questionsByCategory.other++;
     return { allowed: true, reason: null };
 }
 
@@ -290,10 +232,10 @@ function checkRateLimit(ip) {
         return { allowed: false, message: "Too many questions. Please wait a moment." };
     }
     if (userData.dailyCount >= limitsConfig.dailyQuota) {
-        return { allowed: false, message: "Daily question limit reached. Please come back tomorrow." };
+        return { allowed: false, message: "Daily limit reached. Please come back tomorrow." };
     }
     if (userData.sessionCount >= limitsConfig.maxMessagesPerSession) {
-        return { allowed: false, message: "Conversation limit reached. Please refresh the page to start a new conversation." };
+        return { allowed: false, message: "Conversation limit reached. Please refresh the page." };
     }
     userData.minuteCount++;
     userData.dailyCount++;
@@ -307,16 +249,9 @@ setInterval(() => {
     for (const [ip, data] of usageTracker.entries()) {
         if (now > data.dailyReset && now > data.minuteReset) usageTracker.delete(ip);
     }
-    for (const [sessionId, timestamp] of userSessionStart.entries()) {
-        if (now - timestamp > 3600000) {
-            conversationMemory.delete(sessionId);
-            userLanguagePreference.delete(sessionId);
-            userSessionStart.delete(sessionId);
-        }
-    }
 }, 3600000);
 
-// ========== CACHED FAQ LOADER ==========
+// ========== FAQ LOADER ==========
 function loadFAQs() {
     try {
         if (!fs.existsSync(FAQ_PATH)) return null;
@@ -343,7 +278,7 @@ function loadFAQs() {
     } catch (error) { return null; }
 }
 
-// ========== MULTI-LANGUAGE DETECTION ==========
+// ========== LANGUAGE DETECTION ==========
 function detectLanguage(text) {
     analytics.totalQuestions++;
     const normalizedQuestion = text.toLowerCase().replace(/[^\w\s]/g, '').substring(0, 100);
@@ -359,10 +294,8 @@ function detectLanguage(text) {
 // ========== API ENDPOINTS ==========
 app.get('/api/analytics', (req, res) => {
     const topQuestions = Array.from(analytics.mostAskedQuestions.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 15)
+        .sort((a, b) => b[1] - a[1]).slice(0, 15)
         .map(([q, c]) => ({ question: q, count: c }));
-    const tokenSummary = getTokenAnalyticsSummary();
     res.json({
         totalQuestions: analytics.totalQuestions,
         questionsByLanguage: analytics.questionsByLanguage,
@@ -372,7 +305,7 @@ app.get('/api/analytics', (req, res) => {
         blockedQuestions: analytics.blockedQuestions,
         activeSessionsToday: analytics.dailyActiveSessions.size,
         uptimeHours: ((Date.now() - analytics.startTime) / 3600000).toFixed(1),
-        tokenAnalytics: tokenSummary
+        tokenAnalytics: getTokenAnalyticsSummary()
     });
 });
 
@@ -445,12 +378,12 @@ app.post('/api/feedback', (req, res) => {
     if (fs.existsSync(logPath)) {
         try { feedback = JSON.parse(fs.readFileSync(logPath, 'utf8')); } catch(e) {}
     }
-    feedback.push({ timestamp: new Date().toISOString(), rating, question, answer: answer?.substring(0, 200) });
+    feedback.push({ timestamp: new Date().toISOString(), rating, question });
     fs.writeFileSync(logPath, JSON.stringify(feedback, null, 2));
     res.json({ success: true });
 });
 
-// ========== MAIN CHAT ENDPOINT (Conversational) ==========
+// ========== MAIN CHAT ENDPOINT ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const userQuestion = req.body.userMessage;
@@ -461,7 +394,11 @@ app.post('/api/chat', async (req, res) => {
     
     const rateCheck = checkRateLimit(clientIp);
     if (!rateCheck.allowed) return res.json({ reply: rateCheck.message });
-    const topicCheck = isQuestionAllowed(userQuestion);
+    
+    let history = conversationMemory.get(clientIp) || [];
+    const historyText = history.slice(-8).map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    
+    const topicCheck = isQuestionAllowed(userQuestion, history);
     if (!topicCheck.allowed) return res.json({ reply: topicCheck.reason });
     
     const faqData = loadFAQs();
@@ -473,82 +410,59 @@ app.post('/api/chat', async (req, res) => {
         userLanguagePreference.set(clientIp, detectedLang);
     }
     
-    let history = conversationMemory.get(clientIp) || [];
-    const historyText = history.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n');
-    
     const isBookingQuestion = /availability|available|book|booking|price|cost|rate/i.test(userQuestion);
-    const isLocalInfoQuestion = /weather|restaurant|bar|cafe|attraction|museum|transport|directions|how to get|taxi|bus|train|old town|city center/i.test(userQuestion);
-    const questionCategory = detectCategory(userQuestion);
+    const isLocalInfoQuestion = /weather|restaurant|attraction|museum|transport|directions|how to get|taxi|bus|train|old town|city center/i.test(userQuestion);
+    const questionCategory = isBookingQuestion ? 'booking' : (isLocalInfoQuestion ? 'local' : 'hotel');
     
     if (isLocalInfoQuestion && botConfig.webSearchEnabled) analytics.webSearchUsage++;
     
-    // Check if this is a confirmation/follow-up question
-    const isConfirmation = /(just|only|really)\?$|is that (all|it|correct)|so that's it|that's all/i.test(userQuestion);
-    
-    // ÖBB Transport Integration
+    // ÖBB Transport
     let transportInfo = "";
     if (isPublicTransportQuestion(userQuestion) && oebb) {
-        const destinations = {
-            "old town": "Salzburg Mirabellplatz",
-            "altstadt": "Salzburg Mirabellplatz",
-            "city center": "Salzburg Mirabellplatz",
-            "zentrum": "Salzburg Mirabellplatz",
-            "hauptbahnhof": "Salzburg Hauptbahnhof",
-            "main station": "Salzburg Hauptbahnhof",
-            "airport": "Salzburg Airport",
-            "flughafen": "Salzburg Airport"
-        };
-        
+        const destinations = { "old town": "Salzburg Mirabellplatz", "altstadt": "Salzburg Mirabellplatz", "city center": "Salzburg Mirabellplatz", "hauptbahnhof": "Salzburg Hauptbahnhof", "airport": "Salzburg Airport" };
         let destination = null;
         for (const [key, value] of Object.entries(destinations)) {
-            if (userQuestion.toLowerCase().includes(key)) {
-                destination = value;
-                break;
-            }
+            if (userQuestion.toLowerCase().includes(key)) { destination = value; break; }
         }
-        
         if (destination) {
             const journey = await getJourney(HOTEL_STATION, destination);
             if (journey && journey.sections && journey.sections[0]) {
                 const section = journey.sections[0];
                 const duration = journey.duration ? Math.round(journey.duration / 60000) : "?";
-                transportInfo = `\n\n🚆 Real-time from ${HOTEL_STATION} to ${destination}: ${section.category?.name || 'Bus'} ${section.category?.number || ''}, departing ${section.from?.departure?.substring(11, 16) || 'soon'}, about ${duration} minutes.`;
+                transportInfo = `\n\nReal-time from ${HOTEL_STATION} to ${destination}: ${section.category?.name || 'Bus'} ${section.category?.number || ''}, departing ${section.from?.departure?.substring(11, 16) || 'soon'}, about ${duration} minutes.`;
             }
         }
     }
     
     const languageInstructions = {
-        english: "RESPOND IN ENGLISH. Be warm, conversational, and friendly.",
-        german: "ANTWORTE AUF DEUTSCH. Seien Sie warmherzig und gesprächig.",
-        chinese: "用中文回复。保持温暖、对话式、友好。"
+        english: "RESPOND IN ENGLISH. Be direct, warm, and conversational. Never start with repetitive phrases. Vary your language.",
+        german: "ANTWORTE AUF DEUTSCH. Direkt, warm und gesprächig.",
+        chinese: "用中文回复。直接、温暖、对话式。"
     };
     
-    const systemPrompt = `You are a warm, conversational hotel assistant at Hotel Vogelweiderhof.
+    const systemPrompt = `You are a hotel assistant at Hotel Vogelweiderhof (Vogelweiderstraße 93/B, 5020 Salzburg).
 
-PERSONALITY: ${botConfig.personality}
+PERSONALITY: Answer directly and conversationally. Never use repetitive openings like "Great question!" or "That's a wonderful question!" Just answer naturally. Vary your responses. Never end with a question - make statements.
 
-SAFETY: ${botConfig.safetyRules}
-
-STYLE: ${botConfig.styleRules}
+STYLE RULES: Use sentence case. At most one emoji per message. Never use bold for passwords. End with periods, not question marks.
 
 ${languageInstructions[detectedLang] || languageInstructions.english}
 
-${isConfirmation ? "This is a follow-up/confirmation question. Respond warmly and conversationally. For example, if they ask 'just internet?', say 'That's right! Just internet - nice and simple. Need anything else?' Keep it friendly!" : ""}
-
 ${transportInfo ? `REAL-TIME TRANSPORT:${transportInfo}\n` : ""}
 
-PREVIOUS CONVERSATION for context:
+PREVIOUS CONVERSATION:
 ${historyText || "None"}
 
-HOTEL INFO: ${faqText}
+HOTEL INFO:
+${faqText}
 
-The hotel address is: Vogelweiderstraße 93/B, 5020 Salzburg, Austria.
+Hotel address: Vogelweiderstraße 93/B, 5020 Salzburg, Austria.
 
 ${isBookingQuestion ? `Booking link: ${botConfig.bookingLink}` : ''}
 
 GUEST: ${userQuestion}
 
-Be warm, conversational, and helpful. Keep responses friendly but not too long. Use occasional emojis like 😊 or 👍. Never use bold or special formatting for passwords. If giving a password, present it as plain text.`;
+Remember: NO repetitive openings. NO ending with questions. Answer naturally.`;
 
     try {
         const apiRequest = {
@@ -571,28 +485,26 @@ Be warm, conversational, and helpful. Keep responses friendly but not too long. 
         }
         
         if (isBookingQuestion && !reply.includes('direct-book.com')) {
-            reply += `\n\n🔗 ${botConfig.bookingLink}`;
+            reply += `\n\n${botConfig.bookingLink}`;
         }
         
-        history.push({ role: "user", content: userQuestion.substring(0, 100) });
-        history.push({ role: "assistant", content: reply.substring(0, 200) });
-        if (history.length > 10) history.splice(0, 2);
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: reply.substring(0, 300) });
+        if (history.length > 12) history.splice(0, 2);
         conversationMemory.set(clientIp, history);
         
         res.json({ reply: reply });
     } catch (error) {
         console.error('Chat error:', error.message);
-        res.json({ reply: "I'm having a little trouble right now. Could you try again? 😊" });
+        res.json({ reply: "I'm having trouble right now. Please try again." });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`\n✅ Conversational Hotel Chat Bot running on port ${PORT}`);
+    console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`💬 Personality: Warm, friendly, conversational`);
-    console.log(`🔑 Password formatting: Plain text (no bold)`);
-    console.log(`🚍 ÖBB Transport: ${oebb ? 'ENABLED' : 'DISABLED (using web search)'}`);
-    console.log(`🌍 Languages: English, German, Chinese`);
-    console.log(`😊 Temperature: 0.7 (natural conversation)\n`);
+    console.log(`💬 Style: Direct, no repetitive openings, no ending questions`);
+    console.log(`😊 Emojis: Max 1 per message`);
+    console.log(`🚍 ÖBB Transport: ${oebb ? 'ENABLED' : 'Disabled'}\n`);
 });
