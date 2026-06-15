@@ -4,7 +4,7 @@
 
 CHECK-IN TIME | 3:00 PM
 CHECK-OUT TIME | 11:00 AM
-WIFI PASSWORD | wifi password is: Internet
+WIFI PASSWORD | wifi password is small cases just: internet
 WIFI NETWORK | Vogelweiderhof
 
 ONLINE CHECK-IN | Link for Online-Check-in will be send automatically 3 days before Arrival date. The online-check-in is mandatory by law, and is also necessary to get the Guest Mobility Ticket
