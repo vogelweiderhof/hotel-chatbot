@@ -28,8 +28,14 @@ function isWeekendOrHoliday() {
     return (dayOfWeek === 0 || dayOfWeek === 6);
 }
 
-// ========== VAO/HAFAS API FOR REAL-TIME BUS DEPARTURES ==========
+// ========== VAO/HAFAS API ==========
 const VAO_API_URL = "https://vao.demo.hafas.de/gate";
+
+let busDataCache = {
+    data: null,
+    timestamp: null,
+    expiryMs: 60000
+};
 
 async function findStation(stationName) {
     try {
@@ -65,7 +71,7 @@ async function findStation(stationName) {
     }
 }
 
-async function getRealTimeDepartures(stationName, maxResults = 30) {
+async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = null) {
     try {
         const station = await findStation(stationName);
         if (!station) return null;
@@ -110,7 +116,6 @@ async function getRealTimeDepartures(stationName, maxResults = 30) {
             let line = prod?.name || prod?.line || "";
             let productName = prod?.name || "";
             
-            // Extract bus number
             let busNumber = null;
             const numberMatch = productName.match(/\b(\d{2,3})\b/);
             if (numberMatch) busNumber = numberMatch[1];
@@ -125,10 +130,8 @@ async function getRealTimeDepartures(stationName, maxResults = 30) {
             };
         });
         
-        // Filter out entries without bus numbers and remove duplicates
         results = results.filter(r => r.busNumber && r.departureTime !== "--:--");
         
-        // Remove duplicate times for same bus number and direction
         const uniqueResults = [];
         const seen = new Set();
         for (const r of results) {
@@ -139,6 +142,10 @@ async function getRealTimeDepartures(stationName, maxResults = 30) {
             }
         }
         
+        if (filterLine) {
+            return uniqueResults.filter(r => r.busNumber === filterLine);
+        }
+        
         return uniqueResults;
         
     } catch (error) {
@@ -147,36 +154,51 @@ async function getRealTimeDepartures(stationName, maxResults = 30) {
     }
 }
 
-// ========== GET ALL BUS DEPARTURES FROM KEY STOPS ==========
-async function getAllBusData() {
-    const stops = [
-        { name: "Baron Schwarz Park", context: "hotel" },
-        { name: "Hanuschplatz", context: "city_center" },
-        { name: "Salzburg Hbf", context: "train_station" }
-    ];
-    
-    const allData = {};
-    
-    for (const stop of stops) {
-        const departures = await getRealTimeDepartures(stop.name, 40);
-        if (departures) {
-            allData[stop.context] = {
-                stopName: stop.name,
-                departures: departures
-            };
-        }
+// ========== DEDICATED BUS API ENDPOINT ==========
+app.get('/api/bus-times', async (req, res) => {
+    const now = Date.now();
+    if (busDataCache.data && busDataCache.timestamp && (now - busDataCache.timestamp) < busDataCache.expiryMs) {
+        return res.json(busDataCache.data);
     }
     
-    return allData;
-}
+    try {
+        const hotelDepartures = await getRealTimeDepartures("Baron Schwarz Park", 30, "21");
+        const cityCenterBuses = hotelDepartures ? hotelDepartures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn')) : [];
+        
+        const bus120Departures = await getRealTimeDepartures("Baron Schwarz Park", 20, "120");
+        const trainStationBuses = bus120Departures ? bus120Departures.filter(d => d.direction.toLowerCase().includes('hauptbahnhof')) : [];
+        
+        const busData = {
+            timestamp: new Date().toISOString(),
+            bus21: { times: cityCenterBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) },
+            bus120: { times: trainStationBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) }
+        };
+        
+        busDataCache = { data: busData, timestamp: now, expiryMs: 60000 };
+        res.json(busData);
+        
+    } catch (error) {
+        console.error('Bus API error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch bus times' });
+    }
+});
 
-// ========== WEATHER API ==========
-async function getWeatherData() {
+// ========== WEATHER API ENDPOINT ==========
+let weatherCache = { data: null, timestamp: null, expiryMs: 600000 };
+
+app.get('/api/weather', async (req, res) => {
+    const now = Date.now();
+    if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
+        return res.json(weatherCache.data);
+    }
+    
     try {
         const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
         const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
         
-        if (!geoResponse.data.results || geoResponse.data.results.length === 0) return null;
+        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
+            return res.status(500).json({ error: 'Location not found' });
+        }
         
         const location = geoResponse.data.results[0];
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
@@ -185,7 +207,7 @@ async function getWeatherData() {
         const current = weatherResponse.data.current_weather;
         const daily = weatherResponse.data.daily;
         
-        if (!current) return null;
+        if (!current) return res.status(500).json({ error: 'No weather data' });
         
         const weatherCodes = {
             0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
@@ -193,7 +215,7 @@ async function getWeatherData() {
             65: "Heavy rain", 71: "Light snow", 73: "Moderate snow", 75: "Heavy snow", 95: "Thunderstorm"
         };
         
-        return {
+        const weatherData = {
             city: location.name,
             current: {
                 temperature: current.temperature,
@@ -207,79 +229,29 @@ async function getWeatherData() {
                 condition: weatherCodes[daily.weather_code[i]] || "Unknown"
             }))
         };
+        
+        weatherCache = { data: weatherData, timestamp: now, expiryMs: 600000 };
+        res.json(weatherData);
+        
     } catch (error) {
-        console.log("Weather API error:", error.message);
-        return null;
+        console.error('Weather API error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch weather' });
     }
-}
+});
 
 // ========== STATIC KNOWLEDGE BASE ==========
 function getKnowledgeBase() {
     return {
         busStops: {
-            "Baron Schwarz Park": {
-                location: "Hotel Vogelweiderhof bus stop, 30 meters from the hotel",
-                coordinates: "Schallmoos district"
-            },
-            "Hanuschplatz": {
-                location: "City center stop, near Old Town",
-                coordinates: "Altstadt"
-            },
-            "Salzburg Hbf": {
-                location: "Salzburg Main Train Station",
-                coordinates: "Hauptbahnhof"
-            },
-            "Markartplatz": {
-                location: "Central square in Salzburg",
-                coordinates: "Near Old Town"
-            }
+            "Baron Schwarz Park": { location: "Hotel Vogelweiderhof bus stop, 30 meters from the hotel" },
+            "Hanuschplatz": { location: "City center stop, near Old Town" },
+            "Salzburg Hbf": { location: "Salzburg Main Train Station" }
         },
         busRoutes: {
-            "21": {
-                description: "Connects Hotel Vogelweiderhof with City Center",
-                directions: {
-                    "Fürstenbrunn": "City Center (Altstadt)",
-                    "Bergheim": "Back to Hotel area (Baron Schwarz Park)"
-                }
-            },
-            "120": {
-                description: "Connects Hotel Vogelweiderhof with Train Station",
-                directions: {
-                    "Hauptbahnhof": "Salzburg Main Train Station",
-                    "Pelting": "Back to Hotel area (Baron Schwarz Park)"
-                }
-            },
-            "121": {
-                description: "Connects Hotel Vogelweiderhof with Train Station (same route as 120)",
-                directions: {
-                    "Hauptbahnhof": "Salzburg Main Train Station",
-                    "Pelting": "Back to Hotel area (Baron Schwarz Park)"
-                }
-            },
-            "150": {
-                description: "From Train Station to Bad Ischl (connection to Hallstatt)",
-                directions: {
-                    "Bad Ischl": "Transfer to Bus 541 → Bus 543 for Hallstatt"
-                }
-            },
-            "840": {
-                description: "From Train Station to Königssee (Germany)",
-                directions: {
-                    "Jennerbahn": "Get off at 'Königssee' stop for the lake"
-                }
-            },
-            "25": {
-                description: "From Markartplatz to Hellbrunn, Zoo, Untersbergbahn",
-                directions: {
-                    "Untersbergbahn": "Hellbrunn Palace, Zoo, Untersberg cable car"
-                }
-            }
+            "21": { description: "Connects Hotel Vogelweiderhof with City Center", directions: { "Fürstenbrunn": "City Center (Altstadt)", "Bergheim": "Back to Hotel area" } },
+            "120": { description: "Connects Hotel Vogelweiderhof with Train Station", directions: { "Hauptbahnhof": "Salzburg Main Train Station", "Pelting": "Back to Hotel area" } }
         },
-        guestTicket: {
-            name: "Guest Mobility Ticket",
-            description: "Free public transport in Salzburg province",
-            requires: "Online check-in before arrival"
-        },
+        guestTicket: { name: "Guest Mobility Ticket", description: "Free public transport in Salzburg province" },
         nearbyRestaurants: [
             { name: "Smash to Go", location: "Beside hotel", cuisine: "Burgers", discount: "15% for hotel guests" },
             { name: "Mr. Cevap", location: "1 min walk", cuisine: "Balkan grill" },
@@ -329,19 +301,49 @@ function loadFAQs() {
 const analytics = {
     totalQuestions: 0,
     totalTokensUsed: 0,
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
     estimatedCostUSD: 0,
     mostAskedQuestions: new Map(),
     dailyActiveSessions: new Set(),
+    tokenUsageByCategory: {},
+    recentTokenUsage: [],
     startTime: Date.now()
 };
 
 const COST_PER_MILLION_TOKENS = 0.20;
 
-function updateTokenAnalytics(usage) {
+function updateTokenAnalytics(usage, category = 'general') {
     if (!usage) return;
+    
+    const promptTokens = usage.prompt_tokens || 0;
+    const completionTokens = usage.completion_tokens || 0;
     const totalTokens = usage.total_tokens || 0;
+    
     analytics.totalTokensUsed += totalTokens;
-    analytics.estimatedCostUSD += (totalTokens / 1000000) * COST_PER_MILLION_TOKENS;
+    analytics.totalPromptTokens += promptTokens;
+    analytics.totalCompletionTokens += completionTokens;
+    
+    const cost = (totalTokens / 1000000) * COST_PER_MILLION_TOKENS;
+    analytics.estimatedCostUSD += cost;
+    
+    if (!analytics.tokenUsageByCategory[category]) {
+        analytics.tokenUsageByCategory[category] = 0;
+    }
+    analytics.tokenUsageByCategory[category] += totalTokens;
+    
+    analytics.recentTokenUsage.unshift({
+        timestamp: new Date().toISOString(),
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        totalTokens: totalTokens,
+        cost: cost.toFixed(6),
+        category: category
+    });
+    
+    if (analytics.recentTokenUsage.length > 20) {
+        analytics.recentTokenUsage.pop();
+    }
 }
 
 setInterval(() => {
@@ -428,12 +430,24 @@ app.get('/api/analytics', (req, res) => {
     const topQuestions = Array.from(analytics.mostAskedQuestions.entries())
         .sort((a, b) => b[1] - a[1]).slice(0, 15)
         .map(([q, c]) => ({ question: q, count: c }));
+    
+    const avgTokensPerQuestion = analytics.totalQuestions > 0 
+        ? Math.round(analytics.totalTokensUsed / analytics.totalQuestions) 
+        : 0;
+    
     res.json({
         totalQuestions: analytics.totalQuestions,
         topQuestions: topQuestions,
-        totalTokensUsed: analytics.totalTokensUsed,
-        estimatedCostUSD: analytics.estimatedCostUSD.toFixed(4),
-        activeSessionsToday: analytics.dailyActiveSessions.size
+        activeSessionsToday: analytics.dailyActiveSessions.size,
+        tokenAnalytics: {
+            estimatedCostUSD: analytics.estimatedCostUSD.toFixed(4),
+            totalTokens: analytics.totalTokensUsed,
+            totalPromptTokens: analytics.totalPromptTokens,
+            totalCompletionTokens: analytics.totalCompletionTokens,
+            averageTokensPerQuestion: avgTokensPerQuestion,
+            tokenUsageByCategory: analytics.tokenUsageByCategory,
+            recentTokenUsage: analytics.recentTokenUsage
+        }
     });
 });
 
@@ -454,6 +468,7 @@ app.post('/api/reset-session', (req, res) => {
     const userData = usageTracker.get(clientIp);
     if (userData) { userData.sessionCount = 0; }
     conversationMemory.delete(clientIp);
+    userSessionStart.delete(clientIp);
     res.json({ success: true });
 });
 
@@ -489,7 +504,7 @@ app.post('/api/toggle-search', (req, res) => {
     res.json({ success: true });
 });
 
-// ========== MAIN CHAT ENDPOINT - AI DOES ALL THE REASONING ==========
+// ========== MAIN CHAT ENDPOINT ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const userQuestion = req.body.userMessage;
@@ -505,108 +520,38 @@ app.post('/api/chat', async (req, res) => {
     const faqContent = loadFAQs();
     let history = conversationMemory.get(clientIp) || [];
     const isWeekend = isWeekendOrHoliday();
-    
-    // Fetch real-time data
-    console.log("🔄 Fetching live bus data...");
-    const busData = await getAllBusData();
-    console.log("✅ Live bus data fetched");
-    
-    const weatherData = await getWeatherData();
     const knowledgeBase = getKnowledgeBase();
     
-    // Build conversation history
     const historyText = history.slice(-10).map(msg => `${msg.role}: ${msg.content}`).join('\n');
     
-    // The system prompt - AI does all the reasoning
     const systemPrompt = `You are a helpful hotel assistant at Hotel Vogelweiderhof in Salzburg.
 
-========================================
-YOUR TASK
-========================================
-Understand what the guest is asking and provide helpful, accurate information. You have access to:
-1. Real-time bus departure data
-2. Current weather data
-3. FAQ and hotel information
-4. Knowledge about Salzburg
-
-========================================
-REAL-TIME BUS DATA (LIVE FROM ÖBB)
-========================================
-
-${JSON.stringify(busData, null, 2)}
-
-========================================
-WEATHER DATA (LIVE)
-========================================
-
-${weatherData ? JSON.stringify(weatherData, null, 2) : "Weather data currently unavailable"}
-
-========================================
-STATIC KNOWLEDGE BASE
-========================================
-
+STATIC KNOWLEDGE BASE:
 ${JSON.stringify(knowledgeBase, null, 2)}
 
-========================================
-HOTEL FAQ
-========================================
-
+HOTEL FAQ:
 ${faqContent}
 
-========================================
-CONVERSATION HISTORY
-========================================
-
+CONVERSATION HISTORY:
 ${historyText || "No previous conversation"}
 
-========================================
-CURRENT QUESTION
-========================================
-
+CURRENT QUESTION:
 Guest: ${userQuestion}
 
-========================================
-INSTRUCTIONS
-========================================
-
-1. LANGUAGE: Respond in the SAME language as the guest's question. If they ask in German, respond in German. If in English, respond in English. If they switch languages, switch with them.
-
-2. BUS QUERIES: When asked about buses:
-   - Understand where the guest is (hotel? city center? train station?) from context
-   - Understand where they want to go
-   - Show ONLY relevant departures for their journey
-   - Filter bus data to show only the bus line they asked about
-   - Format departure times clearly (e.g., "20:34")
-   - Include delay information if present
-   - Mention the Guest Mobility Ticket makes the ride FREE
-
-3. LOCATION MAPPING:
-   - "Fürstenbrunn" direction = City Center (Altstadt)
-   - "Bergheim" direction = Back to Hotel area (Baron Schwarz Park)
-   - "Hauptbahnhof" = Main Train Station
-   - "Pelting" = Back to Hotel area (from train station)
-
-4. ROUTE QUERIES: When asked "how to get to X":
-   - Provide the best bus option
-   - Include direction, travel time, and bus stop location
-   - Remind about free Guest Mobility Ticket
-
-5. WEATHER QUERIES: Use the weather data above to answer
-
-6. RESTAURANT/FOOD QUERIES: Use the knowledge base
-
-7. SIGHTSEEING QUERIES: Use the knowledge base
-
-8. CRITICAL RULES:
+INSTRUCTIONS:
+1. LANGUAGE: Respond in the SAME language as the guest's question.
+2. BUS QUERIES: Tell guests to check the live bus overlay or ask for specific times.
+3. ROUTE QUERIES: Provide the best bus option with direction and travel time.
+4. WEATHER QUERIES: Direct guests to ask for current conditions.
+5. CRITICAL RULES:
    - NEVER end responses with questions
-   - NEVER ask "Would you like...", "Can I help you with...", "Is there anything else..."
+   - NEVER ask "Would you like...", "Can I help you...", "Is there anything else..."
    - Just state the information and stop
    - Be warm, helpful, and concise
-   - Use bullet points or line breaks for clarity
 
 ${isWeekend ? "NOTE: Today is a weekend or holiday. Bus schedules may have reduced frequency." : ""}
 
-Now, respond to the guest's question naturally and helpfully.`;
+Respond naturally and helpfully.`;
 
     try {
         const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
@@ -621,18 +566,23 @@ Now, respond to the guest's question naturally and helpfully.`;
         
         let reply = response.data.choices[0].message.content;
         
-        // Safety: remove any trailing question marks
         reply = reply.replace(/\?$/, '.');
         reply = reply.replace(/ Would you like.*$/s, '');
         reply = reply.replace(/ Can I help.*$/s, '');
         reply = reply.replace(/ Is there anything.*$/s, '');
         reply = reply.replace(/ Let me know if.*$/s, '');
+        reply = reply.replace(/ Feel free to.*$/s, '');
         
         if (response.data.usage) {
-            updateTokenAnalytics(response.data.usage);
+            let category = 'general';
+            const lowerQuestion = userQuestion.toLowerCase();
+            if (lowerQuestion.includes('bus') || lowerQuestion.includes('fahrplan') || lowerQuestion.includes('abfahrt')) category = 'bus';
+            else if (lowerQuestion.includes('wetter') || lowerQuestion.includes('weather') || lowerQuestion.includes('temp')) category = 'weather';
+            else if (lowerQuestion.includes('restaurant') || lowerQuestion.includes('essen') || lowerQuestion.includes('food')) category = 'restaurant';
+            else if (lowerQuestion.includes('sehenswürdigkeiten') || lowerQuestion.includes('sightseeing') || lowerQuestion.includes('attraction')) category = 'sights';
+            updateTokenAnalytics(response.data.usage, category);
         }
         
-        // Store in conversation memory
         analytics.totalQuestions++;
         const normalizedQuestion = userQuestion.toLowerCase().substring(0, 100);
         analytics.mostAskedQuestions.set(normalizedQuestion, (analytics.mostAskedQuestions.get(normalizedQuestion) || 0) + 1);
@@ -646,8 +596,7 @@ Now, respond to the guest's question naturally and helpfully.`;
         
     } catch (error) {
         console.error('Chat error:', error.message);
-        const errorReply = "I'm having technical difficulties. Please try again later.";
-        res.json({ reply: errorReply });
+        res.json({ reply: "I'm having technical difficulties. Please try again later." });
     }
 });
 
@@ -655,16 +604,12 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`🚆 VAO/HAFAS API: ENABLED (LIVE real-time departures)`);
-    console.log(`🌤️ Weather API: ENABLED (Open-Meteo)`);
-    console.log(`🧠 AI-POWERED: The AI understands context, location, and language`);
-    console.log(`📦 Raw bus data provided to AI - AI decides what to show`);
+    console.log(`🚆 Bus API: ENABLED (cached for 60 seconds)`);
+    console.log(`🌤️ Weather API: ENABLED (cached for 10 minutes)`);
+    console.log(`📊 Analytics: Tracking tokens and costs`);
     console.log(`💾 Conversation memory: ENABLED`);
     console.log(`📋 FAQ loaded: ${loadFAQs() !== "No FAQ loaded" ? "YES" : "NO"}`);
-    console.log(`\n✅ The AI automatically:`);
-    console.log(`   • Detects language from the question`);
-    console.log(`   • Figures out where the user is and where they want to go`);
-    console.log(`   • Filters bus departures to show only relevant direction`);
-    console.log(`   • Never ends responses with questions`);
-    console.log(`   • Uses real-time bus data live from ÖBB\n`);
+    console.log(`\n✅ The AI never ends responses with questions`);
+    console.log(`✅ /api/bus-times provides live bus data for overlay`);
+    console.log(`✅ /api/weather provides cached weather data\n`);
 });
