@@ -2,7 +2,7 @@
 # Format: QUESTION | ANSWER
 # Lines starting with # are ignored
 
-CHECK-IN TIME | 3:00 PM
+CHECK-IN TIME | 3:00 PM to 8:00PM.
 CHECK-OUT TIME | 11:00 AM
 WIFI PASSWORD | wifi password is small cases just: internet
 WIFI NETWORK | Vogelweiderhof
