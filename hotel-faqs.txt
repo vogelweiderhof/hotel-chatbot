@@ -4,7 +4,7 @@
 
 CHECK-IN TIME | 3:00 PM
 CHECK-OUT TIME | 11:00 AM
-WIFI PASSWORD | wifi password is: internet
+WIFI PASSWORD | wifi password is: Internet
 WIFI NETWORK | Vogelweiderhof
 
 ONLINE CHECK-IN | Link for Online-Check-in will be send automatically 3 days before Arrival date. The online-check-in is mandatory by law, and is also necessary to get the Guest Mobility Ticket
@@ -20,18 +20,24 @@ PARKING | Free on-site parking available. no parking Reservation. parking is aft
 RESTAURANT | currently we only serve breakfast.
 
 ADRESS | Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg
-LOCATION | Located in Schallmoos. Bus 21 goes directly into City Center. Bus 120/121 to trainstation. Bus stop is just 30meters from the hotel. 
+LOCATION | Located in Schallmoos. Bus 21 goes directly into City Center. Bus 120/121 to trainstation. Bus stop is just 30meters from the hotel. Bus from trainstation to hotel takes around 10-11 minutes.
 POSTAL CODE | 5020
 CITY | Salzburg
 COUNTRY | Austria
 NEAREST BUS STOP | Baron Schwarz Park, 30 meters from hotel.
-BUS LINES | Bus line 21 goes through the City Center. Bus line 120 and 121 go to the trainstation.
-BUS NAVIGATION | USe Google map as all bus lines are integrated. click on the bus stop to see the timer of when the next bus will arrive. The Website www.oebb.at Always up to date.
+BUS LINES | Bus line 21 goes through the City Center. Bus line 120 and 121 go to the trainstation. Bus 21 does not go to trainstation, you will have to Change the line.
+BUS NAVIGATION | Use Google map as all bus lines are integrated. click on the bus stop to see the timer of when the next bus will arrive. The Website www.oebb.at Always up to date. MAke sure to wave at bus 120/121, as they do not automatically stop at each stop. 
+BUS DIRECTION | From our hotel bus stop, "Baron Schwarz Park": Bus 21: for City Center the direction is Fürstenbrunn. Bus 120/121: for trainstation the direction is Hauptbahnhof. If you are coming from City Center/trainstation. the direction for bus 21 is Bergheim. The direction for bus 120/121 is Palting. 
 
 WALKING TO CITY CENTER | Walking will take 30-45 minutes. the distance is around 2-2,5km. Easiest is to follow the Vogelweiderstraße towards the City Center, at the end of the street, turn Right and you will be Walking into the City Center. 
 TAXI | Taxi number is 0043 662 8111. Uber and some other ride Vehicle app also work, but may are limited in numerbers. 
 
 RECEPTION | Reception of Hotel is in Building B. which is in the Courtyard. 
+
+
+GUEST MOBILITY TICKET | Guest mobility ticket is included for the whole stay. Online-check-in is necessary to receive the tickets. be sure to mark all persons to receive the tickets. only once the guest agrees to it, can we send it. link for online check-in will be send automatically 3 days before Arrival date. Guest mobility tickets will only be send our daily from around noon to 8pm evening. Guest Mobily Ticket allows you to use all public Transportation in Province Salzburg for free. 
+HALLSTATT | The stop byside Hallstatt lake is called "Hallstatt Lahn". Recommended to use www.oebb.at for Routing. Bus only route has better view. Bus 150, Change to BUS 541. Change form Bus 541 to Bus 543 at "Hallstatt Gosaumühle". Bus 543 will stop at Hallstatt Lahn, which is directly byside the Hallstatt lake. If you are going by Train, you will have to take the Ferry to cross the lake, as hallstatt trainstation is at other side of the lake. Guest Mobility Ticket is valid till Bad Ischl, so you only have to buy the ticket from Bad Ischl to Hallstatt.
+
 
 
 EMERGENCY HOTLINES | Police: 133, Fire Brigade: 122, Ambulance: 144
