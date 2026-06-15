@@ -1,6 +1,7 @@
 {
   "name": "hotel-chatbot",
   "version": "1.0.0",
+  "type": "module",
   "description": "Hotel chatbot with ÖBB transport integration",
   "main": "server.js",
   "scripts": {
@@ -11,6 +12,6 @@
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.3.1",
-    "oebb-api": "^1.0.0"
+    "hafas-client": "^6.3.6"
   }
 }

@@ -1,9 +1,14 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const fs = require('fs');
-const path = require('path');
+import dotenv from 'dotenv';
+import express from 'express';
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -16,148 +21,541 @@ app.use((req, res, next) => {
     next();
 });
 
-// ========== HOTEL LOCATION ==========
-const HOTEL_ADDRESS = "Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg";
-const NEAREST_BUS_STOP = "Baron Schwarz Park";
+// ========== CHECK IF TODAY IS WEEKEND OR HOLIDAY ==========
+function isWeekendOrHoliday() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return true;
+    
+    const year = today.getFullYear();
+    const holidays = [
+        `${year}-01-01`, `${year}-01-06`, `${year}-04-21`, `${year}-05-01`,
+        `${year}-05-29`, `${year}-06-09`, `${year}-06-19`, `${year}-08-15`,
+        `${year}-10-26`, `${year}-11-01`, `${year}-12-08`, `${year}-12-25`, `${year}-12-26`
+    ];
+    const todayStr = today.toISOString().split('T')[0];
+    return holidays.includes(todayStr);
+}
 
-// ========== WORKING ÖBB API USING OFFICIAL ENDPOINT ==========
-// This uses the public ÖBB Scotty API that actually works
+// ========== HARDCODED WIFI RESPONSE ==========
+function getWifiResponse() {
+    return "The WiFi password is: internet (all lowercase). The network name is Vogelweiderhof.";
+}
 
-async function getRealTimeDepartures(stationName, maxResults = 5) {
+// ========== WEATHER API (Open-Meteo - Most Reliable Free Weather API) ==========
+async function getWeather(city = "Salzburg") {
     try {
-        // First, search for the station ID
-        const searchUrl = `https://fahrplan.oebb.at/bin/query.exe/dny?L=vs_webapp&xml=true&REQ0JourneyStopsS0A=1&REQ0JourneyStopsS0G=${encodeURIComponent(stationName)}`;
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+        const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
         
-        const searchResponse = await axios.get(searchUrl, { timeout: 8000 });
-        const searchData = searchResponse.data;
-        
-        // Extract station ID from XML (simplified - looking for stopID)
-        let stationId = null;
-        const stopIdMatch = searchData.match(/stopID="([^"]+)"/);
-        if (stopIdMatch) stationId = stopIdMatch[1];
-        
-        if (!stationId) {
-            console.log(`Could not find station ID for: ${stationName}`);
+        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
             return null;
         }
         
-        // Now get departures using the station ID
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const location = geoResponse.data.results[0];
+        const lat = location.latitude;
+        const lon = location.longitude;
         
-        const departuresUrl = `https://fahrplan.oebb.at/bin/query.exe/dny?L=vs_webapp&xml=true&REQ0JourneyStopsS0A=1&REQ0JourneyStopsS0ID=${stationId}&REQ0HafasSearchForw=1&date=${year}${month}${day}&time=${hours}${minutes}&maxJourneys=${maxResults}`;
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
+        const weatherResponse = await axios.get(weatherUrl, { timeout: 8000 });
         
-        const departuresResponse = await axios.get(departuresUrl, { timeout: 8000 });
-        const xmlData = departuresResponse.data;
+        const current = weatherResponse.data.current_weather;
+        const daily = weatherResponse.data.daily;
         
-        // Parse XML response for journeys
-        const journeys = [];
-        const journeyMatches = xmlData.matchAll(/<Journey>([\s\S]*?)<\/Journey>/g);
+        if (!current) return null;
         
-        for (const match of journeyMatches) {
-            const journeyXml = match[1];
-            
-            // Extract line/product name
-            let line = "Bus/Train";
-            const prodMatch = journeyXml.match(/<Prod(?:ection)?[^>]*name="([^"]+)"/);
-            if (prodMatch) line = prodMatch[1];
-            
-            // Extract destination
-            let destination = "";
-            const destMatch = journeyXml.match(/<Dest[^>]*>([^<]+)<\/Dest>/);
-            if (destMatch) destination = destMatch[1];
-            
-            // Extract departure time
-            let departureTime = "";
-            const timeMatch = journeyXml.match(/<Time[^>]*>([^<]+)<\/Time>/);
-            if (timeMatch) departureTime = timeMatch[1];
-            
-            // Extract delay if any
-            let delay = 0;
-            const delayMatch = journeyXml.match(/<RTDelay>([^<]+)<\/RTDelay>/);
-            if (delayMatch) delay = parseInt(delayMatch[1]) || 0;
-            
-            if (line && destination && departureTime) {
-                journeys.push({ line, direction: destination, departureTime, delay });
-            }
-            
-            if (journeys.length >= maxResults) break;
+        let response = `Weather in ${location.name}:\n`;
+        response += `Current: ${current.temperature}°C, ${getWeatherDescription(current.weathercode)}\n`;
+        response += `Wind: ${current.windspeed} km/h\n\n`;
+        
+        response += `3-Day Forecast:\n`;
+        for (let i = 0; i < daily.time.length && i < 3; i++) {
+            const day = new Date(daily.time[i]);
+            const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
+            response += `${dayName}: High ${daily.temperature_2m_max[i]}°C / Low ${daily.temperature_2m_min[i]}°C, ${getWeatherDescription(daily.weather_code[i])}\n`;
         }
         
-        return journeys.length > 0 ? journeys : null;
-        
+        return response;
     } catch (error) {
-        console.log("ÖBB API error:", error.message);
+        console.log("Weather API error:", error.message);
         return null;
     }
 }
 
-// Alternative: Use simple web scraping for real data
-async function getSimpleDepartures(stationName) {
+function getWeatherDescription(code) {
+    const descriptions = {
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+        45: "Foggy",
+        51: "Light drizzle",
+        61: "Light rain",
+        63: "Moderate rain",
+        65: "Heavy rain",
+        71: "Light snow",
+        73: "Moderate snow",
+        75: "Heavy snow",
+        95: "Thunderstorm"
+    };
+    return descriptions[code] || "Unknown";
+}
+
+// ========== CURRENCY CONVERSION API (Frankfurter - ECB Official Data) ==========
+async function convertCurrency(amount, from, to) {
     try {
-        // Try the mobile version of ÖBB which is simpler
-        const searchUrl = `https://fahrplan.oebb.at/webapp/#!P|TP!H${encodeURIComponent(stationName)}`;
+        from = from.toUpperCase();
+        to = to.toUpperCase();
         
-        // This is a fallback - for actual implementation, we'll use a reliable public API
-        // Since ÖBB doesn't provide a free public API, we'll use a workaround
+        const url = `https://api.frankfurter.app/latest?from=${from}&to=${to}`;
+        const response = await axios.get(url, { timeout: 8000 });
         
+        if (response.data && response.data.rates) {
+            const rate = response.data.rates[to];
+            const converted = (amount * rate).toFixed(2);
+            return `${amount} ${from} = ${converted} ${to}\nExchange rate: 1 ${from} = ${rate} ${to}\nData from European Central Bank (ECB)`;
+        }
         return null;
     } catch (error) {
+        console.log("Currency API error:", error.message);
         return null;
     }
 }
 
-// ========== ALTERNATIVE: Use a working public transport API ==========
-// Since ÖBB API is unreliable, we'll provide schedule info from FAQ
-// and guide users to official sources
-
-function getScheduleFromFAQ(question) {
-    const lower = question.toLowerCase();
+// ========== TIME ZONE INFO (Built-in Node.js) ==========
+function getTimeZoneInfo() {
+    const now = new Date();
+    const salzburgTime = now.toLocaleString('en-US', { timeZone: 'Europe/Vienna' });
+    const isDST = isDaylightSavingTime(now);
     
-    if (lower.includes('bus 150')) {
-        return `Bus 150 schedule information:
-• Route: Salzburg → Bad Ischl (towards Hallstatt direction)
-• Frequency: Approximately every 30-60 minutes
-• First bus: Around 5:00 AM
-• Last bus: Around 8:00 PM
-• Journey time: ~1.5 hours to Bad Ischl
+    return `Current time in Salzburg: ${salzburgTime}\nTime zone: Central European Time (CET/CEST)\nDaylight Saving Time: ${isDST ? 'Active (UTC+2)' : 'Not active (UTC+1)'}\nSalzburg is 1 hour ahead of London, 6 hours ahead of New York.`;
+}
 
-For exact real-time departures today, please check:
-• www.oebb.at (official, always up to date)
-• Google Maps (click on the bus stop for live times)
-• Scotty app by ÖBB
+function isDaylightSavingTime(date) {
+    const jan = new Date(date.getFullYear(), 0, 1);
+    const jul = new Date(date.getFullYear(), 6, 1);
+    const stdTimezoneOffset = Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+    return date.getTimezoneOffset() < stdTimezoneOffset;
+}
 
-Would you like the full scenic route to Hallstatt using Bus 150?`;
+// ========== RESTAURANTS NEAR HOTEL (ACCURATE) ==========
+function getNearbyRestaurants() {
+    return `Restaurants near Hotel Vogelweiderhof:
+
+BESIDE THE HOTEL (1-3 min walk):
+
+Smash to Go (Food Truck)
+Location: Beside the hotel building on Vogelweiderstraße
+Cuisine: Burgers
+Special: 15% discount for hotel guests!
+
+Mr. Cevap
+Location: Next to the hotel, 1 min walk
+Cuisine: Balkan grill
+Note: Small inside but highly recommendable
+
+Gasthaus Turnerwirt
+Location: Opposite side of the main street
+Distance: 3 min walk
+Cuisine: Traditional Austrian
+
+ALONG VOGELWEIDERSTRASSE (20 min walk or short bus ride):
+
+Restaurant Fuxn
+Location: Vogelweiderstraße
+Cuisine: Austrian
+Take Bus 120 or 121 to Pauernfeindstraße (direction Hauptbahnhof or Pelting)
+
+CITY CENTER (15 min by Bus 21 - FREE with Guest Mobility Ticket):
+
+Sternbräu
+Cuisine: Traditional Austrian
+Located in the heart of Salzburg's Old Town
+
+St. Peter
+Cuisine: Traditional Austrian
+The oldest restaurant in Europe! Located at St. Peter's Abbey
+
+Stieglkeller
+Cuisine: Austrian with Stiegl beer
+Located near the Old Town with views of the fortress
+
+Augustinerbräu (Müllnerbräu)
+Cuisine: Traditional Austrian, monastery brewery
+Take Bus 21 to Landeskrankenhaus stop (just opposite the brewery)
+
+HOW TO GET THERE:
+From hotel: Bus 21 from Baron Schwarz Park (30m from hotel)
+Direction to city center: Fürstenbrunn
+Your Guest Mobility Ticket makes the bus FREE
+
+Would you like Bus 21 departure times from the hotel?`;
+}
+
+// ========== SIGHTS & ATTRACTIONS ==========
+function getSights() {
+    return `Sights and Attractions in Salzburg:
+
+There are no major sightseeing attractions within walking distance of Hotel Vogelweiderhof.
+
+However, the city center is just 15 minutes away by Bus 21.
+
+Take Bus 21 from Baron Schwarz Park bus stop (30 meters from the hotel).
+Direction to look for: Fürstenbrunn
+
+Your Guest Mobility Ticket makes this bus ride FREE for your entire stay.
+
+TOP SIGHTS IN SALZBURG CITY CENTER:
+
+Hohensalzburg Fortress (Festung Hohensalzburg)
+One of the largest preserved castles in Central Europe. Take the FestungsBahn cable car from the Old Town.
+
+Mirabell Palace & Gardens (Schloss Mirabell)
+Beautiful baroque palace with stunning gardens. Free entry to gardens.
+
+Mozart's Birthplace (Mozarts Geburtshaus)
+Getreidegasse 9 - where Mozart was born in 1756.
+
+Salzburg Cathedral (Salzburger Dom)
+Stunning baroque cathedral at Domplatz.
+
+Getreidegasse
+Famous shopping street with traditional wrought-iron signs.
+
+Hellbrunn Palace (Schloss Hellbrunn)
+Famous for trick fountains. Take Bus 25 from Markartplatz.
+
+Untersberg Mountain
+At 1,853m with cable car. Take Bus 25 from Markartplatz to Untersbergbahn.
+
+Gaisberg Mountain
+At 1,287m with panoramic views. Take Bus 151 from Mirabellplatz.
+
+HOW TO RETURN TO HOTEL:
+Take Bus 21 from city center with direction Bergheim
+Get off at Baron Schwarz Park
+
+Would you like Bus 21 departure times from the hotel?`;
+}
+
+// ========== EVENTS CALENDAR ==========
+function getEvents() {
+    return `Upcoming Events in Salzburg (from official Salzburg Tourism):
+
+Mozart Week
+When: Late January (around Mozart's birthday, Jan 27)
+One of the major musical highlights in Salzburg.
+
+Salzburg Easter Festival (Osterfestspiele)
+When: Saturday before Palm Sunday through Easter Monday
+Founded by Herbert von Karajan in 1967.
+
+Salzburg Whitsun Festival (Pfingstfestspiele)
+When: Whit Saturday to Whit Monday (May/June)
+Classical music festival featuring international orchestras.
+
+Sommerszene Festival
+When: Summer
+Contemporary dance, theatre, performance, and installations.
+
+Salzburg Festival (Salzburger Festspiele)
+When: 5 weeks from late July to August
+World-renowned celebration of music and drama.
+
+Jazz & The City
+When: 5 days festival
+Jazz and electronic music at unusual venues.
+
+Winterfest
+When: End of November to early January
+One of the biggest modern circus festivals.
+
+Salzburg Advent Singing & Christmas Markets
+When: Advent season (November-December)
+Christkindlmarkt on Cathedral and Residenzplatz squares.
+
+For exact dates and tickets, please visit www.salzburg.info/en/events.`;
+}
+
+// ========== HOTEL BUS KNOWLEDGE BASE ==========
+const BUS_KNOWLEDGE = {
+    fromHotel: {
+        "21": {
+            direction: "Fürstenbrunn",
+            destination: "City Center",
+            description: "Goes directly to Salzburg City Center. Your Guest Mobility Ticket makes this FREE!",
+            tips: "Direction to look for: Fürstenbrunn. Bus stop is 30 meters from hotel."
+        },
+        "120": {
+            direction: "Hauptbahnhof",
+            destination: "Salzburg Main Train Station",
+            description: "Goes to the main train station. Also passes Restaurant Fuxn (get off at Pauernfeindstraße)",
+            tips: "Wave to the driver to stop! Direction: Hauptbahnhof"
+        },
+        "121": {
+            direction: "Hauptbahnhof",
+            destination: "Salzburg Main Train Station",
+            description: "Goes to the main train station (same route as 120)",
+            tips: "Wave to the driver to stop! Direction: Hauptbahnhof"
+        }
+    },
+    fromCityCenter: {
+        "21": {
+            direction: "Bergheim",
+            destination: "Hotel Vogelweiderhof",
+            description: "Returns to the hotel area",
+            tips: "Direction to look for: Bergheim. Get off at Baron Schwarz Park"
+        }
+    },
+    fromTrainStation: {
+        "120": {
+            direction: "Pelting",
+            destination: "Hotel Vogelweiderhof",
+            description: "Stops at Baron Schwarz Park (your hotel)",
+            tips: "Direction: Pelting. Get off at Baron Schwarz Park"
+        },
+        "121": {
+            direction: "Pelting",
+            destination: "Hotel Vogelweiderhof",
+            description: "Stops at Baron Schwarz Park (your hotel)",
+            tips: "Direction: Pelting. Get off at Baron Schwarz Park"
+        },
+        "150": {
+            direction: "Bad Ischl",
+            destination: "Hallstatt Connection",
+            description: "Important bus for Hallstatt",
+            tips: "Take Bus 150 to Bad Ischl, then Bus 541 to Bus 543 to Hallstatt Lahn"
+        },
+        "840": {
+            direction: "Jennerbahn",
+            destination: "Königssee (Germany)",
+            description: "Goes to Königssee in Bavaria, Germany",
+            tips: "Perfect for visiting Königssee lake. Bring your passport!"
+        },
+        "151": {
+            direction: "Gaisberg",
+            destination: "Gaisberg Mountain",
+            description: "Goes to Gaisberg viewpoint",
+            tips: "Great for hiking. Departs from Mirabellplatz. Limited service on weekends!"
+        }
+    },
+    fromMarkartplatz: {
+        "25": {
+            direction: "Untersbergbahn",
+            destination: "Untersberg Cable Car",
+            description: "Goes to Schloss Hellbrunn, Salzburg Zoo, and Untersbergbahn",
+            tips: "Stops at Hellbrunn Palace (trick fountains), Zoo Salzburg, Untersbergbahn cable car"
+        }
+    }
+};
+
+// ========== DESTINATION INFO ==========
+function getDestinationInfo(destination) {
+    const info = {
+        "hallstatt": "Take Bus 150 from Salzburg Hbf to Bad Ischl, then Bus 541 to Bus 543 to Hallstatt Lahn (directly at the lake). Train alternative: Train to Attnang-Puchheim to Hallstatt train to ferry. Guest Mobility Ticket valid only until Bad Ischl.",
+        "königssee": "Take Bus 840 from Salzburg Hbf to Jennerbahn. Journey takes about 1 hour. Bring your passport as it crosses into Germany. The lake is stunning with emerald-green water.",
+        "gaisberg": "Take Bus 151 from Mirabellplatz to Gaisbergspitze. At 1,287m, it offers amazing views of Salzburg and the Alps. Limited service on weekends.",
+        "untersberg": "Take Bus 25 from Markartplatz to Untersbergbahn. The cable car takes you to 1,853m with a 360° view.",
+        "hellbrunn": "Take Bus 25 from Markartplatz to Schloss Hellbrunn. Famous for trick fountains - a must-see!",
+        "zoo": "Take Bus 25 from Markartplatz to Zoo Salzburg. Home to over 150 species."
+    };
+    return info[destination] || null;
+}
+
+// ========== VAO/HAFAS API ==========
+const VAO_API_URL = "https://vao.demo.hafas.de/gate";
+
+async function findStation(stationName) {
+    try {
+        const requestBody = {
+            svcReqL: [{
+                req: { input: { loc: { name: stationName }, field: "S" } },
+                meth: "LocMatch",
+                id: "1|1|"
+            }],
+            client: { id: "VAO", v: "1", type: "AND", name: "nextgen" },
+            ver: "1.73",
+            lang: "en",
+            auth: { aid: "nextgen", type: "AID" }
+        };
+        
+        const response = await axios.post(VAO_API_URL, requestBody, {
+            timeout: 10000,
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const locations = response.data?.svcResL?.[0]?.res?.match?.locL || [];
+        if (locations && locations.length > 0) {
+            return {
+                name: locations[0].name,
+                extId: locations[0].extId,
+                type: locations[0].type || "S"
+            };
+        }
+        return null;
+    } catch (error) {
+        console.log("Station search error:", error.message);
+        return null;
+    }
+}
+
+async function getRealTimeDepartures(stationName, maxResults = 15, filterLine = null) {
+    try {
+        const station = await findStation(stationName);
+        if (!station) {
+            console.log(`Station "${stationName}" not found`);
+            return null;
+        }
+        
+        const now = new Date();
+        const date = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const time = now.toTimeString().slice(0, 8).replace(/:/g, '');
+        
+        const requestBody = {
+            svcReqL: [{
+                req: {
+                    stbLoc: { extId: station.extId, type: station.type },
+                    type: "DEP",
+                    maxJny: maxResults,
+                    date: date,
+                    time: time
+                },
+                meth: "StationBoard",
+                id: "1|1|"
+            }],
+            client: { id: "VAO", v: "1", type: "AND", name: "nextgen" },
+            ver: "1.73",
+            lang: "en",
+            auth: { aid: "nextgen", type: "AID" }
+        };
+        
+        const response = await axios.post(VAO_API_URL, requestBody, {
+            timeout: 10000,
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const journeys = response.data?.svcResL?.[0]?.res?.jnyL || [];
+        const common = response.data?.svcResL?.[0]?.res?.common;
+        
+        if (!journeys.length) return null;
+        
+        let results = journeys.slice(0, maxResults).map(jny => {
+            const prod = common?.prodL?.[jny.prodX];
+            const depTime = jny.stbStop?.dTimeS || "";
+            const delay = jny.stbStop?.dTimeR ? parseInt(jny.stbStop.dTimeR) - parseInt(jny.stbStop.dTimeS) : 0;
+            
+            let line = prod?.name || prod?.line || "";
+            let productType = prod?.type || "UNKNOWN";
+            let productName = prod?.name || "";
+            
+            let busNumber = null;
+            if (productType === "BUS") {
+                const numberMatch = productName.match(/\b(\d{2,3})\b/);
+                if (numberMatch) busNumber = numberMatch[1];
+                const lineMatch = line.match(/\b(\d{2,3})\b/);
+                if (lineMatch && !busNumber) busNumber = lineMatch[1];
+            }
+            
+            let displayLine = line;
+            if (productType === "BUS" && busNumber) {
+                displayLine = `Bus ${busNumber}`;
+            } else if (productType === "BUS") {
+                displayLine = `Bus ${line}`;
+            }
+            
+            return {
+                line: displayLine,
+                rawLine: line,
+                busNumber: busNumber,
+                productType: productType,
+                direction: jny.dirTxt || "",
+                departureTime: depTime ? `${depTime.slice(0,2)}:${depTime.slice(2,4)}` : "--:--",
+                delay: delay
+            };
+        });
+        
+        if (filterLine) {
+            const filterNum = filterLine.toString();
+            results = results.filter(r => 
+                r.busNumber === filterNum || 
+                r.rawLine.includes(filterNum) ||
+                r.line.includes(filterNum)
+            );
+        }
+        
+        return results.length > 0 ? results : null;
+        
+    } catch (error) {
+        console.error('VAO API error:', error.message);
+        return null;
+    }
+}
+
+// ========== GENERATE BUS RESPONSE ==========
+async function generateBusResponse(busNumber, context = "hotel") {
+    const isWeekend = isWeekendOrHoliday();
+    const dayType = isWeekend ? " (Weekend/Holiday Schedule)" : " (Weekday Schedule)";
+    
+    let stationToQuery = "";
+    let busInfo = null;
+    let location = "";
+    
+    if (context === "hotel") {
+        stationToQuery = "Baron Schwarz Park";
+        if (busNumber === "21") busInfo = BUS_KNOWLEDGE.fromHotel["21"];
+        else if (busNumber === "120") busInfo = BUS_KNOWLEDGE.fromHotel["120"];
+        else if (busNumber === "121") busInfo = BUS_KNOWLEDGE.fromHotel["121"];
+        location = "Baron Schwarz Park (your hotel bus stop, 30m from hotel)";
+    } else if (context === "trainstation") {
+        stationToQuery = "Salzburg Hbf";
+        if (busNumber === "150") busInfo = BUS_KNOWLEDGE.fromTrainStation["150"];
+        else if (busNumber === "840") busInfo = BUS_KNOWLEDGE.fromTrainStation["840"];
+        else if (busNumber === "151") busInfo = BUS_KNOWLEDGE.fromTrainStation["151"];
+        else if (busNumber === "120") busInfo = BUS_KNOWLEDGE.fromTrainStation["120"];
+        else if (busNumber === "121") busInfo = BUS_KNOWLEDGE.fromTrainStation["121"];
+        location = "Salzburg Hauptbahnhof (Main Train Station)";
+    } else if (context === "citycenter") {
+        stationToQuery = "Hanuschplatz";
+        if (busNumber === "21") busInfo = BUS_KNOWLEDGE.fromCityCenter["21"];
+        location = "City Center (e.g., Hanuschplatz)";
+    } else if (context === "markartplatz") {
+        stationToQuery = "Markartplatz";
+        if (busNumber === "25") busInfo = BUS_KNOWLEDGE.fromMarkartplatz["25"];
+        location = "Markartplatz";
     }
     
-    if (lower.includes('bus 120') || lower.includes('bus 121')) {
-        return `Bus 120/121 schedule from Baron Schwarz Park (your hotel):
-• Direction: Hauptbahnhof (Train Station)
-• Frequency: Every 20-30 minutes
-• Journey time: ~10-11 minutes
-• Important: Wave to the driver to stop
-
-For exact real-time departures today, check www.oebb.at or Google Maps.
-
-Bus 21 (different direction) goes to City Center (direction Fürstenbrunn).`;
+    const departures = await getRealTimeDepartures(stationToQuery, 15, busNumber);
+    
+    let response = "";
+    
+    if (isWeekend) {
+        response += "Note: Today is a weekend or public holiday. Buses run less frequently than weekdays.\n\n";
     }
     
-    if (lower.includes('bus 21')) {
-        return `Bus 21 schedule from Baron Schwarz Park (your hotel):
-• Direction: Fürstenbrunn (City Center)
-• Frequency: Every 15-20 minutes
-• Journey time: ~15 minutes to City Center
-
-For exact real-time departures, check www.oebb.at or Google Maps.
-
-Bus 21 does NOT go to the train station - use Bus 120/121 for that.`;
+    if (busInfo) {
+        response += `Bus ${busNumber} from ${location}${dayType}\n\n`;
+        response += `Destination: ${busInfo.destination}\n`;
+        response += `Direction: ${busInfo.direction}\n`;
+        response += `${busInfo.description}\n`;
+        response += `Tip: ${busInfo.tips}\n\n`;
     }
     
-    return null;
+    if (departures && departures.length > 0) {
+        response += `Live departures today:\n`;
+        for (const dep of departures.slice(0, 8)) {
+            const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : '';
+            response += `${dep.departureTime}${delayText}\n`;
+        }
+        response += `\nFor real-time updates, check www.oebb.at or Google Maps.\n`;
+    } else {
+        response += `No live departures found in the next hour. Please check www.oebb.at for schedule information.\n`;
+    }
+    
+    if (isWeekend) {
+        response += `\nWeekend/Holiday Reminder: Buses may have reduced service. Always check live departures above.`;
+    }
+    
+    return response;
 }
 
 // ========== CONVERSATION MEMORY ==========
@@ -165,10 +563,24 @@ const conversationMemory = new Map();
 const userLanguagePreference = new Map();
 const userSessionStart = new Map();
 
-// ========== FAQ CACHING ==========
+// ========== FAQ LOADER ==========
 let cachedFAQ = null;
 let lastFAQModified = 0;
 const FAQ_PATH = path.join(__dirname, 'hotel-faqs.txt');
+
+function loadFAQs() {
+    try {
+        if (!fs.existsSync(FAQ_PATH)) return "No FAQ loaded";
+        const stats = fs.statSync(FAQ_PATH);
+        if (stats.mtimeMs === lastFAQModified && cachedFAQ) return cachedFAQ;
+        cachedFAQ = fs.readFileSync(FAQ_PATH, 'utf8');
+        lastFAQModified = stats.mtimeMs;
+        console.log(`FAQ loaded`);
+        return cachedFAQ;
+    } catch (error) { 
+        return "FAQ unavailable"; 
+    }
+}
 
 // ========== ANALYTICS ==========
 const analytics = {
@@ -203,12 +615,9 @@ setInterval(() => {
 
 // ========== BOT CONFIGURATION ==========
 let botConfig = {
-    personality: `You are a helpful hotel front desk agent. You understand what the guest really wants.`,
-    
+    personality: `You are a helpful hotel front desk agent at Hotel Vogelweiderhof in Salzburg.`,
     safetyRules: `Never ask for credit card numbers. Never share other guests' data.`,
-    
-    styleRules: `Use sentence case. Be direct, helpful, and warm. Never start with "Great question!". Never end responses with questions.`,
-    
+    styleRules: `Use sentence case. Be direct, helpful, and warm. Never end responses with questions.`,
     websiteContent: "",
     customRules: [],
     bookingLink: "https://direct-book.com/properties/hotelvogelweiderhof",
@@ -271,37 +680,6 @@ setInterval(() => {
     }
 }, 3600000);
 
-// ========== FAQ LOADER ==========
-function loadFAQs() {
-    try {
-        if (!fs.existsSync(FAQ_PATH)) return "No FAQ loaded";
-        const stats = fs.statSync(FAQ_PATH);
-        if (stats.mtimeMs === lastFAQModified && cachedFAQ) return cachedFAQ;
-        cachedFAQ = fs.readFileSync(FAQ_PATH, 'utf8');
-        lastFAQModified = stats.mtimeMs;
-        console.log(`✅ FAQ loaded`);
-        return cachedFAQ;
-    } catch (error) { return "FAQ unavailable"; }
-}
-
-// ========== DETECT GUEST INTENT ==========
-function detectIntent(question) {
-    const lower = question.toLowerCase();
-    
-    if (lower.includes('hallstatt')) return 'hallstatt';
-    if (lower.includes('königssee') || lower.includes('koenigssee')) return 'koenigssee';
-    if (lower.includes('vienna') || lower.includes('wien')) return 'vienna';
-    if (lower.includes('salzburg') && (lower.includes('city center') || lower.includes('altstadt'))) return 'salzburg_city';
-    if (lower.includes('train station') || lower.includes('hauptbahnhof') || lower.includes('hbf')) return 'train_station';
-    if (/(next|when|what time|schedule).*(bus|train|departure)/i.test(question)) return 'schedule';
-    if (lower.includes('bus 150') || lower.includes('bus150')) return 'bus150';
-    if (lower.includes('bus 120') || lower.includes('bus120')) return 'bus120';
-    if (lower.includes('bus 121') || lower.includes('bus121')) return 'bus121';
-    if (lower.includes('bus 21')) return 'bus21';
-    if (lower.includes('bus') || lower.includes('train')) return 'transport';
-    return 'general';
-}
-
 // ========== LANGUAGE DETECTION ==========
 function detectLanguage(text) {
     analytics.totalQuestions++;
@@ -310,6 +688,83 @@ function detectLanguage(text) {
     if (/[äöüß]/i.test(text)) return 'german';
     if (/[\u4e00-\u9fff]/.test(text)) return 'chinese';
     return 'english';
+}
+
+// ========== INTENT DETECTION ==========
+function detectIntent(question) {
+    const lower = question.toLowerCase();
+    
+    // WiFi detection
+    if (lower.includes('wifi') || lower.includes('password') || lower.includes('internet') || lower.includes('network')) {
+        return 'wifi';
+    }
+    
+    // Weather detection
+    if (/(wetter|weather|temp|temperatur|forecast|rain|snow|sun|cloud)/i.test(question)) return 'weather';
+    
+    // Currency detection
+    if (/(currency|euro|dollar|exchange|convert|wechselkurs|umrechnen|usd|eur|gbp|chf|jpy|cny)/i.test(question)) return 'currency';
+    
+    // Time zone detection
+    if (/(time zone|what time is it|current time|local time|zeitzone|wie spät|uhrzeit)/i.test(question)) return 'timezone';
+    
+    // Restaurant detection
+    if (lower.includes('restaurant') || lower.includes('eatery') || lower.includes('food') || 
+        lower.includes('eat') || lower.includes('dinner') || lower.includes('lunch') || 
+        lower.includes('breakfast') || lower.includes('gastronomy') || lower.includes('cuisine')) {
+        return 'restaurants';
+    }
+    
+    // Sightseeing detection
+    if (lower.includes('sightseeing') || lower.includes('sehenswürdigkeiten') || 
+        lower.includes('attraction') || lower.includes('what to see') || 
+        (lower.includes('visit') && (lower.includes('salzburg') || lower.includes('city'))) ||
+        lower.includes('fortress') || lower.includes('festung') || lower.includes('mirabell') ||
+        lower.includes('mozart') || lower.includes('cathedral') || lower.includes('dom')) {
+        return 'sights';
+    }
+    
+    // Events detection
+    if (lower.includes('event') || lower.includes('festival') || lower.includes('konzert') || 
+        lower.includes('concert') || lower.includes('mozart week') || lower.includes('easter festival') || 
+        lower.includes('whitsun') || lower.includes('summer festival') || lower.includes('christmas market')) {
+        return 'events';
+    }
+    
+    // Destination detection
+    if (lower.includes('hallstatt') || lower.includes('königssee') || lower.includes('koenigssee') || 
+        lower.includes('gaisberg') || lower.includes('untersberg') || lower.includes('hellbrunn') || lower.includes('zoo')) {
+        return 'destination';
+    }
+    
+    // Bus detection
+    if (lower.includes('bus 150') || lower.includes('bus150')) return 'bus150_trainstation';
+    if (lower.includes('bus 840') || lower.includes('bus840')) return 'bus840_trainstation';
+    if (lower.includes('bus 151') || lower.includes('bus151')) return 'bus151_trainstation';
+    if (lower.includes('bus 25') || lower.includes('bus25')) return 'bus25_markartplatz';
+    
+    if (lower.includes('bus 21') || lower.includes('bus21')) {
+        if (lower.includes('from city') || lower.includes('from hanusch') || lower.includes('back to hotel')) {
+            return 'bus21_citycenter';
+        }
+        return 'bus21_hotel';
+    }
+    
+    if (lower.includes('bus 120') || lower.includes('bus120')) {
+        if (lower.includes('from train') || lower.includes('from hbf')) {
+            return 'bus120_trainstation';
+        }
+        return 'bus120_hotel';
+    }
+    
+    if (lower.includes('bus 121') || lower.includes('bus121')) {
+        if (lower.includes('from train') || lower.includes('from hbf')) {
+            return 'bus121_trainstation';
+        }
+        return 'bus121_hotel';
+    }
+    
+    return 'general';
 }
 
 // ========== API ENDPOINTS ==========
@@ -385,25 +840,13 @@ app.post('/api/chat', async (req, res) => {
     const userQuestion = req.body.userMessage;
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     
-    if (!apiKey) return res.json({ reply: "❌ API key missing." });
+    if (!apiKey) return res.json({ reply: "API key missing. Please contact reception." });
     if (!userSessionStart.has(clientIp)) userSessionStart.set(clientIp, Date.now());
     
     const rateCheck = checkRateLimit(clientIp);
     if (!rateCheck.allowed) return res.json({ reply: rateCheck.message });
     const topicCheck = isQuestionAllowed(userQuestion);
     if (!topicCheck.allowed) return res.json({ reply: topicCheck.reason });
-    
-    // CHECK FOR SCHEDULE QUESTIONS FROM FAQ FIRST
-    const scheduleAnswer = getScheduleFromFAQ(userQuestion);
-    if (scheduleAnswer) {
-        // Store in conversation memory
-        let history = conversationMemory.get(clientIp) || [];
-        history.push({ role: "user", content: userQuestion.substring(0, 150) });
-        history.push({ role: "assistant", content: scheduleAnswer.substring(0, 300) });
-        if (history.length > 10) history.splice(0, 2);
-        conversationMemory.set(clientIp, history);
-        return res.json({ reply: scheduleAnswer });
-    }
     
     const faqContent = loadFAQs();
     let history = conversationMemory.get(clientIp) || [];
@@ -417,54 +860,253 @@ app.post('/api/chat', async (req, res) => {
     
     const isBookingQuestion = /book|price|cost|rate|availability/i.test(userQuestion);
     const intent = detectIntent(userQuestion);
+    const lowerQuestion = userQuestion.toLowerCase();
     
+    // ========== HARDCODED WIFI RESPONSE ==========
+    if (intent === 'wifi') {
+        const wifiReply = getWifiResponse();
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: wifiReply });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: wifiReply });
+    }
+    
+    // ========== WEATHER ==========
+    if (intent === 'weather') {
+        let weatherReply = await getWeather("Salzburg");
+        if (!weatherReply) {
+            weatherReply = "Weather information is currently unavailable. Please check a weather app for Salzburg forecast.";
+        }
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: weatherReply.substring(0, 500) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: weatherReply });
+    }
+    
+    // ========== CURRENCY CONVERSION ==========
+    if (intent === 'currency') {
+        let amount = 1;
+        let from = "EUR";
+        let to = "USD";
+        
+        const amountMatch = lowerQuestion.match(/(\d+(?:\.\d+)?)/);
+        if (amountMatch) amount = parseFloat(amountMatch[1]);
+        
+        const currencyMatches = lowerQuestion.match(/\b(eur|usd|gbp|chf|jpy|cny|aud|cad|try|sek|nok|dkk|pln|czk)\b/gi);
+        if (currencyMatches && currencyMatches.length >= 2) {
+            from = currencyMatches[0].toUpperCase();
+            to = currencyMatches[1].toUpperCase();
+        } else if (lowerQuestion.includes('to usd')) {
+            from = "EUR";
+            to = "USD";
+        } else if (lowerQuestion.includes('to eur')) {
+            from = "USD";
+            to = "EUR";
+        }
+        
+        let currencyReply = await convertCurrency(amount, from, to);
+        if (!currencyReply) {
+            currencyReply = `Currency conversion is currently unavailable. Please try asking like "convert 50 EUR to USD" or check www.xe.com.`;
+        }
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: currencyReply });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: currencyReply });
+    }
+    
+    // ========== TIME ZONE ==========
+    if (intent === 'timezone') {
+        const timezoneReply = getTimeZoneInfo();
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: timezoneReply });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: timezoneReply });
+    }
+    
+    // ========== RESTAURANTS ==========
+    if (intent === 'restaurants') {
+        const reply = getNearbyRestaurants();
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: reply });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: reply });
+    }
+    
+    // ========== SIGHTS ==========
+    if (intent === 'sights') {
+        const reply = getSights();
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: reply });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: reply });
+    }
+    
+    // ========== EVENTS ==========
+    if (intent === 'events') {
+        const reply = getEvents();
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: reply });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: reply });
+    }
+    
+    // ========== DESTINATION INFO ==========
+    if (intent === 'destination') {
+        let info = null;
+        if (lowerQuestion.includes('hallstatt')) info = getDestinationInfo('hallstatt');
+        else if (lowerQuestion.includes('königssee') || lowerQuestion.includes('koenigssee')) info = getDestinationInfo('königssee');
+        else if (lowerQuestion.includes('gaisberg')) info = getDestinationInfo('gaisberg');
+        else if (lowerQuestion.includes('untersberg')) info = getDestinationInfo('untersberg');
+        else if (lowerQuestion.includes('hellbrunn')) info = getDestinationInfo('hellbrunn');
+        else if (lowerQuestion.includes('zoo')) info = getDestinationInfo('zoo');
+        
+        if (info) {
+            const response = `Travel Information:\n\n${info}`;
+            history.push({ role: "user", content: userQuestion.substring(0, 150) });
+            history.push({ role: "assistant", content: response.substring(0, 300) });
+            if (history.length > 10) history.splice(0, 2);
+            conversationMemory.set(clientIp, history);
+            return res.json({ reply: response });
+        }
+    }
+    
+    // ========== BUS QUERIES ==========
+    if (intent === 'bus21_hotel') {
+        const response = await generateBusResponse("21", "hotel");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus21_citycenter') {
+        const response = await generateBusResponse("21", "citycenter");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus120_hotel') {
+        const response = await generateBusResponse("120", "hotel");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus120_trainstation') {
+        const response = await generateBusResponse("120", "trainstation");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus121_hotel') {
+        const response = await generateBusResponse("121", "hotel");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus121_trainstation') {
+        const response = await generateBusResponse("121", "trainstation");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus150_trainstation') {
+        const response = await generateBusResponse("150", "trainstation");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus840_trainstation') {
+        const response = await generateBusResponse("840", "trainstation");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus151_trainstation') {
+        const response = await generateBusResponse("151", "trainstation");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    if (intent === 'bus25_markartplatz') {
+        const response = await generateBusResponse("25", "markartplatz");
+        history.push({ role: "user", content: userQuestion.substring(0, 150) });
+        history.push({ role: "assistant", content: response.substring(0, 300) });
+        if (history.length > 10) history.splice(0, 2);
+        conversationMemory.set(clientIp, history);
+        return res.json({ reply: response });
+    }
+    
+    // ========== USE DEEPSEEK AI FOR GENERAL QUESTIONS ==========
     const languageInstructions = {
-        english: "RESPOND IN ENGLISH. Be direct and helpful. For schedule questions, direct guests to www.oebb.at or Google Maps for real-time departures.",
-        german: "ANTWORTE AUF DEUTSCH. Seien Sie direkt und hilfreich. Für Fahrplanfragen verweisen Sie auf www.oebb.at oder Google Maps.",
-        chinese: "用中文回复。对于时刻表问题，请引导客人访问 www.oebb.at 或 Google 地图查看实时班次。"
+        english: "RESPOND IN ENGLISH. Be direct and helpful. Never end with questions. Do not use markdown formatting like **bold** or *italics*. Use plain text only with line breaks.",
+        german: "ANTWORTE AUF DEUTSCH. Seien Sie direkt und hilfreich. Beenden Sie Antworten niemals mit Fragen. Verwenden Sie keine Markdown-Formatierung.",
+        chinese: "用中文回复。简洁直接。永远不要以问题结束。不要使用markdown格式。"
     };
+    
+    const isWeekend = isWeekendOrHoliday();
+    const weekendNote = isWeekend ? "\n\nNote: Today is a weekend or public holiday. Bus schedules may have reduced service." : "";
     
     const systemPrompt = `You are a hotel assistant at Hotel Vogelweiderhof (Vogelweiderstraße 93/B, 5020 Salzburg).
 
-**HOTEL FAQ (OFFICIAL INFORMATION - USE THIS FOR ALL ROUTES):**
+HOTEL FAQ:
 ${faqContent}
 
-**INTENT DETECTED:** ${intent}
+IMPORTANT BUS INFORMATION:
+- From hotel (Baron Schwarz Park, 30m from hotel): Bus 21 to City Center (direction Fürstenbrunn). Your Guest Mobility Ticket makes this FREE!
+- Bus 120/121 from hotel to Train Station (direction Hauptbahnhof). Also passes Restaurant Fuxn (get off at Pauernfeindstraße)
+- From Train Station: Bus 120/121 to hotel (direction Pelting), Bus 150 to Hallstatt (direction Bad Ischl), Bus 840 to Königssee (direction Jennerbahn)
+- From City Center back to hotel: Bus 21 (direction Bergheim)
+- From Markartplatz: Bus 25 to Hellbrunn, Zoo, Untersbergbahn
+- Hallstatt route: Bus 150 to Bad Ischl, then Bus 541 to Bus 543 to Hallstatt Lahn
 
-**IMPORTANT - REAL TIME SCHEDULES:**
-The hotel does not have direct API access to real-time bus/train schedules. When guests ask for specific departure times (e.g., "when is the next bus 150"), ALWAYS respond with:
-1. "For real-time departures, please check www.oebb.at or Google Maps - both show live schedules."
-2. Then provide the general frequency from the FAQ (e.g., "Bus 150 runs approximately every 30-60 minutes").
+NEARBY RESTAURANTS (from hotel):
+- Smash to Go (food truck beside hotel, 15% discount for hotel guests)
+- Mr. Cevap (1 min walk, Balkan grill)
+- Gasthaus Turnerwirt (3 min walk, Austrian)
+- Restaurant Fuxn (20 min walk or Bus 120/121 to Pauernfeindstraße)
 
-**SPECIFIC ROUTING INSTRUCTIONS:**
+CITY CENTER RESTAURANTS (via Bus 21, FREE with Guest Mobility Ticket):
+- Sternbräu, St. Peter (oldest restaurant in Europe), Stieglkeller, Augustinerbräu (Bus 21 to Landeskrankenhaus)
 
-1. **HALLSTATT ROUTE (from FAQ - USE THIS):**
-   - There is NO direct connection from Salzburg to Hallstatt (neither bus nor train)
-   - BUS ROUTE (scenic, better views): Bus 150 → change to Bus 541 → change to Bus 543 at "Hallstatt Gosaumühle" → Bus 543 stops at "Hallstatt Lahn" (directly at the lake)
-   - TRAIN ROUTE (faster): Train to Attnang-Puchheim → change to Hallstatt train → then take ferry across lake
-   - Guest Mobility Ticket valid to Bad Ischl only
-
-2. **BUS 150 SCHEDULE:**
-   - Route: Salzburg to Bad Ischl (towards Hallstatt)
-   - Frequency: Every 30-60 minutes
-   - First bus: ~5:00 AM, Last bus: ~8:00 PM
-   - For exact today's departures: www.oebb.at
-
-3. **BUS 120/121 FROM HOTEL:**
-   - From Baron Schwarz Park to Hauptbahnhof (Train Station)
-   - Frequency: Every 20-30 minutes
-   - IMPORTANT: Wave to the driver to stop
-   - For live departures: www.oebb.at or Google Maps
-
-4. **BUS 21 FROM HOTEL:**
-   - From Baron Schwarz Park to City Center (direction Fürstenbrunn)
-   - Frequency: Every 15-20 minutes
-
-**CRITICAL RULES:**
-- NEVER say you don't have schedule information without directing to www.oebb.at
-- For any "when is the next bus/train" question: First give the website, THEN give general frequency
+CRITICAL RULES:
 - Never end responses with questions
-- Be warm and helpful
+- Never say "feel free to ask" or "would you like more details"
+- Be warm and helpful, then stop
+- Do not use any markdown formatting like asterisks, bold, or italics
+- Give plain text responses only with line breaks
+${weekendNote}
 
 ${languageInstructions[detectedLang] || languageInstructions.english}
 
@@ -474,14 +1116,12 @@ ${historyText || "None"}
 GUEST: ${userQuestion}`;
 
     try {
-        const apiRequest = {
+        const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
             model: "deepseek-chat",
             messages: [{ role: "user", content: systemPrompt }],
             temperature: 0.6,
             max_tokens: limitsConfig.maxTokensPerResponse
-        };
-        
-        const response = await axios.post('https://api.deepseek.com/v1/chat/completions', apiRequest, {
+        }, {
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             timeout: 25000
         });
@@ -510,9 +1150,13 @@ GUEST: ${userQuestion}`;
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
-    console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`📋 FAQ Priority: HIGH`);
-    console.log(`🚆 Real-time schedules: Using FAQ + direct links to www.oebb.at`);
-    console.log(`🔍 Web Search: ${botConfig.webSearchEnabled ? 'ENABLED' : 'DISABLED'}\n`);
+    console.log(`\nHotel Chat Bot running on port ${PORT}`);
+    console.log(`Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
+    console.log(`VAO/HAFAS API: ENABLED (real-time bus/train departures)`);
+    console.log(`Weather API: ENABLED (Open-Meteo)`);
+    console.log(`Currency API: ENABLED (Frankfurter/ECB)`);
+    console.log(`Restaurants: Hardcoded with accurate locations`);
+    console.log(`Sights: Via Bus 21 to city center`);
+    console.log(`Weekend/holiday detection: ENABLED`);
+    console.log(`FAQ loaded: ${loadFAQs() !== "No FAQ loaded" ? "YES" : "NO"}\n`);
 });
