@@ -21,21 +21,11 @@ app.use((req, res, next) => {
     next();
 });
 
+// ========== HELPER FUNCTIONS ==========
 function isWeekendOrHoliday() {
     const today = new Date();
     const dayOfWeek = today.getDay();
     return (dayOfWeek === 0 || dayOfWeek === 6);
-}
-
-// ========== LANGUAGE DETECTION ==========
-function detectLanguage(text) {
-    analytics.totalQuestions++;
-    
-    if (/[äöüß]/i.test(text)) return 'german';
-    if (/(wie|was|wo|wann|warum|ich|du|sie|wir|mir|dich|kann|mag|möchte|bitte|danke|guten|tag|morgen|abend|hallo|tschüss|straße|platz|bahn|bus|hotel|zimmer|preis|kosten|reservierung|frühstück|check-in|check-out|welche|welcher|welches|dem|den|der|die|das|eine|einen|einem|einer|kein|keine|wann|kommt|nächste|nächsten|abfahrtszeiten)/i.test(text)) return 'german';
-    if (/[\u4e00-\u9fff]/.test(text)) return 'chinese';
-    
-    return 'english';
 }
 
 // ========== VAO/HAFAS API FOR REAL-TIME BUS DEPARTURES ==========
@@ -75,7 +65,7 @@ async function findStation(stationName) {
     }
 }
 
-async function getRealTimeDepartures(stationName, maxResults = 20, filterLine = null) {
+async function getRealTimeDepartures(stationName, maxResults = 30) {
     try {
         const station = await findStation(stationName);
         if (!station) return null;
@@ -120,7 +110,7 @@ async function getRealTimeDepartures(stationName, maxResults = 20, filterLine = 
             let line = prod?.name || prod?.line || "";
             let productName = prod?.name || "";
             
-            // Extract bus number from various formats
+            // Extract bus number
             let busNumber = null;
             const numberMatch = productName.match(/\b(\d{2,3})\b/);
             if (numberMatch) busNumber = numberMatch[1];
@@ -128,7 +118,6 @@ async function getRealTimeDepartures(stationName, maxResults = 20, filterLine = 
             if (lineMatch && !busNumber) busNumber = lineMatch[1];
             
             return {
-                line: line,
                 busNumber: busNumber,
                 direction: jny.dirTxt || "",
                 departureTime: depTime ? `${depTime.slice(0,2)}:${depTime.slice(2,4)}` : "--:--",
@@ -136,13 +125,21 @@ async function getRealTimeDepartures(stationName, maxResults = 20, filterLine = 
             };
         });
         
-        // Filter by specific bus number if requested
-        if (filterLine) {
-            const filterNum = filterLine.toString();
-            results = results.filter(r => r.busNumber === filterNum);
+        // Filter out entries without bus numbers and remove duplicates
+        results = results.filter(r => r.busNumber && r.departureTime !== "--:--");
+        
+        // Remove duplicate times for same bus number and direction
+        const uniqueResults = [];
+        const seen = new Set();
+        for (const r of results) {
+            const key = `${r.busNumber}|${r.direction}|${r.departureTime}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniqueResults.push(r);
+            }
         }
         
-        return results;
+        return uniqueResults;
         
     } catch (error) {
         console.error('VAO API error:', error.message);
@@ -150,181 +147,33 @@ async function getRealTimeDepartures(stationName, maxResults = 20, filterLine = 
     }
 }
 
-// ========== FILTERED BUS RESPONSES ==========
-
-async function getBus21Schedule(lang = 'english') {
-    const station = "Baron Schwarz Park";
-    const allDepartures = await getRealTimeDepartures(station, 30, "21");
+// ========== GET ALL BUS DEPARTURES FROM KEY STOPS ==========
+async function getAllBusData() {
+    const stops = [
+        { name: "Baron Schwarz Park", context: "hotel" },
+        { name: "Hanuschplatz", context: "city_center" },
+        { name: "Salzburg Hbf", context: "train_station" }
+    ];
     
-    if (!allDepartures || allDepartures.length === 0) {
-        if (lang === 'german') {
-            return `Keine live Abfahrten für Bus 21 in der nächsten Stunde gefunden. Bitte besuchen Sie www.oebb.at für den Fahrplan.`;
-        }
-        return `No live departures for Bus 21 found in the next hour. Please check www.oebb.at for schedule information.`;
-    }
+    const allData = {};
     
-    // Split departures by direction
-    const cityCenterBuses = [];
-    const otherBuses = [];
-    
-    for (const dep of allDepartures) {
-        const dir = dep.direction.toLowerCase();
-        // Fürstenbrunn is city center direction from hotel
-        if (dir.includes('fürstenbrunn')) {
-            cityCenterBuses.push(dep);
-        } else {
-            otherBuses.push(dep);
+    for (const stop of stops) {
+        const departures = await getRealTimeDepartures(stop.name, 40);
+        if (departures) {
+            allData[stop.context] = {
+                stopName: stop.name,
+                departures: departures
+            };
         }
     }
     
-    if (lang === 'german') {
-        let response = `Bus 21 - Nächste Abfahrten von Baron Schwarz Park (Ihr Hotel):\n\n`;
-        
-        response += `🚍 Richtung Stadtzentrum (Fürstenbrunn):\n`;
-        if (cityCenterBuses.length > 0) {
-            for (const dep of cityCenterBuses.slice(0, 6)) {
-                const delayText = dep.delay > 0 ? ` (${dep.delay} Min Verspätung)` : '';
-                response += `   ${dep.departureTime}${delayText}\n`;
-            }
-        } else {
-            response += `   Keine Abfahrten in der nächsten Stunde\n`;
-        }
-        
-        response += `\n🚍 Andere Richtungen:\n`;
-        if (otherBuses.length > 0) {
-            for (const dep of otherBuses.slice(0, 4)) {
-                const delayText = dep.delay > 0 ? ` (${dep.delay} Min Verspätung)` : '';
-                // Clean up direction names
-                let direction = dep.direction;
-                if (direction.includes('Bergheim')) direction = 'Bergheim (zurück zum Hotel)';
-                if (direction.includes('Hauptbahnhof')) direction = 'Hauptbahnhof';
-                response += `   ${dep.departureTime}${delayText} - ${direction}\n`;
-            }
-        } else {
-            response += `   Keine weiteren Abfahrten in der nächsten Stunde\n`;
-        }
-        
-        response += `\nIhre Gästekarte macht die Fahrt KOSTENLOS.\n`;
-        response += `Für Bus 21 Richtung Stadtzentrum: Richtung Fürstenbrunn`;
-        return response;
-    }
-    
-    // English version
-    let response = `Bus 21 - Next departures from Baron Schwarz Park (your hotel):\n\n`;
-    
-    response += `🚍 Towards City Center (Fürstenbrunn):\n`;
-    if (cityCenterBuses.length > 0) {
-        for (const dep of cityCenterBuses.slice(0, 6)) {
-            const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : '';
-            response += `   ${dep.departureTime}${delayText}\n`;
-        }
-    } else {
-        response += `   No departures in the next hour\n`;
-    }
-    
-    response += `\n🚍 Other directions:\n`;
-    if (otherBuses.length > 0) {
-        for (const dep of otherBuses.slice(0, 4)) {
-            const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : '';
-            let direction = dep.direction;
-            if (direction.includes('Bergheim')) direction = 'Bergheim (back to hotel)';
-            if (direction.includes('Hauptbahnhof')) direction = 'Hauptbahnhof';
-            response += `   ${dep.departureTime}${delayText} - ${direction}\n`;
-        }
-    } else {
-        response += `   No other departures in the next hour\n`;
-    }
-    
-    response += `\nYour Guest Mobility Ticket makes the ride FREE.\n`;
-    response += `For Bus 21 towards city center: look for direction Fürstenbrunn`;
-    return response;
-}
-
-async function getBus120Schedule(lang = 'english') {
-    const station = "Baron Schwarz Park";
-    const allDepartures = await getRealTimeDepartures(station, 20, "120");
-    
-    if (!allDepartures || allDepartures.length === 0) {
-        if (lang === 'german') {
-            return `Keine live Abfahrten für Bus 120 in der nächsten Stunde gefunden. Bitte besuchen Sie www.oebb.at für den Fahrplan.`;
-        }
-        return `No live departures for Bus 120 found in the next hour. Please check www.oebb.at for schedule information.`;
-    }
-    
-    // Filter for train station direction (Hauptbahnhof)
-    const trainStationBuses = [];
-    const otherBuses = [];
-    
-    for (const dep of allDepartures) {
-        const dir = dep.direction.toLowerCase();
-        if (dir.includes('hauptbahnhof') || dir.includes('hbf')) {
-            trainStationBuses.push(dep);
-        } else {
-            otherBuses.push(dep);
-        }
-    }
-    
-    if (lang === 'german') {
-        let response = `Bus 120 - Nächste Abfahrten von Baron Schwarz Park (Ihr Hotel):\n\n`;
-        
-        response += `🚍 Richtung Hauptbahnhof (Train Station):\n`;
-        if (trainStationBuses.length > 0) {
-            for (const dep of trainStationBuses.slice(0, 6)) {
-                const delayText = dep.delay > 0 ? ` (${dep.delay} Min Verspätung)` : '';
-                response += `   ${dep.departureTime}${delayText}\n`;
-            }
-        } else {
-            response += `   Keine Abfahrten in der nächsten Stunde\n`;
-        }
-        
-        if (otherBuses.length > 0) {
-            response += `\n🚍 Andere Richtungen:\n`;
-            for (const dep of otherBuses.slice(0, 3)) {
-                const delayText = dep.delay > 0 ? ` (${dep.delay} Min Verspätung)` : '';
-                response += `   ${dep.departureTime}${delayText} - ${dep.direction}\n`;
-            }
-        }
-        
-        response += `\n⚠️ Wichtig: Winken Sie dem Bus zu, da er nicht automatisch an jeder Haltestelle hält.\n`;
-        response += `Ihre Gästekarte macht die Fahrt KOSTENLOS.`;
-        return response;
-    }
-    
-    // English version
-    let response = `Bus 120 - Next departures from Baron Schwarz Park (your hotel):\n\n`;
-    
-    response += `🚍 Towards Hauptbahnhof (Train Station):\n`;
-    if (trainStationBuses.length > 0) {
-        for (const dep of trainStationBuses.slice(0, 6)) {
-            const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : '';
-            response += `   ${dep.departureTime}${delayText}\n`;
-        }
-    } else {
-        response += `   No departures in the next hour\n`;
-    }
-    
-    if (otherBuses.length > 0) {
-        response += `\n🚍 Other directions:\n`;
-        for (const dep of otherBuses.slice(0, 3)) {
-            const delayText = dep.delay > 0 ? ` (${dep.delay} min delay)` : '';
-            response += `   ${dep.departureTime}${delayText} - ${dep.direction}\n`;
-        }
-    }
-    
-    response += `\n⚠️ Important: Wave to the driver as the bus does not stop automatically.\n`;
-    response += `Your Guest Mobility Ticket makes the ride FREE.`;
-    return response;
-}
-
-function getBus121Schedule(lang = 'english') {
-    // Bus 121 has same route as 120
-    return getBus120Schedule(lang);
+    return allData;
 }
 
 // ========== WEATHER API ==========
-async function getWeather(city = "Salzburg", lang = 'english') {
+async function getWeatherData() {
     try {
-        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
         const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
         
         if (!geoResponse.data.results || geoResponse.data.results.length === 0) return null;
@@ -344,128 +193,117 @@ async function getWeather(city = "Salzburg", lang = 'english') {
             65: "Heavy rain", 71: "Light snow", 73: "Moderate snow", 75: "Heavy snow", 95: "Thunderstorm"
         };
         
-        if (lang === 'german') {
-            let response = `Aktuelles Wetter in ${location.name}:\n`;
-            response += `${current.temperature}°C, ${weatherCodes[current.weathercode] || "Unbekannt"}\n`;
-            response += `Wind: ${current.windspeed} km/h\n\n`;
-            response += `3-Tage-Vorhersage:\n`;
-            for (let i = 0; i < daily.time.length && i < 3; i++) {
-                const day = new Date(daily.time[i]);
-                const dayName = day.toLocaleDateString('de-DE', { weekday: 'short' });
-                response += `${dayName}: Max ${daily.temperature_2m_max[i]}°C / Min ${daily.temperature_2m_min[i]}°C\n`;
-            }
-            return response;
-        }
-        
-        let response = `Current weather in ${location.name}:\n`;
-        response += `${current.temperature}°C, ${weatherCodes[current.weathercode] || "Unknown"}\n`;
-        response += `Wind: ${current.windspeed} km/h\n\n`;
-        response += `3-Day Forecast:\n`;
-        for (let i = 0; i < daily.time.length && i < 3; i++) {
-            const day = new Date(daily.time[i]);
-            const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
-            response += `${dayName}: High ${daily.temperature_2m_max[i]}°C / Low ${daily.temperature_2m_min[i]}°C\n`;
-        }
-        return response;
+        return {
+            city: location.name,
+            current: {
+                temperature: current.temperature,
+                condition: weatherCodes[current.weathercode] || "Unknown",
+                windSpeed: current.windspeed
+            },
+            forecast: daily.time.slice(0, 3).map((time, i) => ({
+                day: new Date(time).toLocaleDateString('en-US', { weekday: 'short' }),
+                high: daily.temperature_2m_max[i],
+                low: daily.temperature_2m_min[i],
+                condition: weatherCodes[daily.weather_code[i]] || "Unknown"
+            }))
+        };
     } catch (error) {
         console.log("Weather API error:", error.message);
         return null;
     }
 }
 
-// ========== STATIC RESPONSES ==========
-function getCityCenterRoute(lang) {
-    if (lang === 'german') {
-        return `So erreichen Sie das Stadtzentrum vom Hotel Vogelweiderhof:
-
-Mit dem Bus (empfohlen):
-Nehmen Sie den Bus 21 ab der Haltestelle Baron Schwarz Park (30 Meter vom Hotel)
-Richtung: Fürstenbrunn
-Fahrzeit: 15 Minuten
-Kosten: KOSTENLOS mit Ihrer Gästekarte
-
-Zu Fuß:
-Entfernung: 2-2,5 km
-Zeit: 30-45 Minuten
-Route: Folgen Sie der Vogelweiderstraße Richtung Stadtzentrum, am Ende biegen Sie rechts ab.
-
-Für live Abfahrtszeiten des Bus 21 fragen Sie einfach nach "Bus 21 Fahrplan".`;
-    }
-    
-    return `To reach the city center from Hotel Vogelweiderhof:
-
-By Bus (recommended):
-Take Bus 21 from Baron Schwarz Park bus stop (30 meters from the hotel)
-Direction: Fürstenbrunn
-Travel time: 15 minutes
-Cost: FREE with your Guest Mobility Ticket
-
-By Walking:
-Distance: 2-2.5 km
-Time: 30-45 minutes
-Route: Follow Vogelweiderstraße towards the city center, at the end turn right.
-
-For live Bus 21 departure times, just ask for "Bus 21 schedule".`;
-}
-
-function getWifiResponse(lang) {
-    if (lang === 'german') {
-        return "Das WLAN-Passwort lautet: internet (alles kleingeschrieben). Der Netzwerkname ist Vogelweiderhof.";
-    }
-    return "The WiFi password is: internet (all lowercase). The network name is Vogelweiderhof.";
-}
-
-function getRestaurants(lang) {
-    if (lang === 'german') {
-        return `Restaurants in der Nähe des Hotel Vogelweiderhof:
-
-DIREKT BEIM HOTEL (1-3 Gehminuten):
-Smash to Go - Food Truck neben dem Hotel, 15% Rabatt für Hotelgäste
-Mr. Cevap - 1 Gehminute, Osteuropäische Grillrestaurant
-Gasthaus Turnerwirt - 3 Gehminuten, traditionelle österreichische Küche
-
-STADTZENTRUM (15 Minuten mit Bus 21, KOSTENLOS mit Gästekarte):
-Sternbräu, St. Peter (ältestes Restaurant Europas), Stieglkeller, Augustinerbräu`;
-    }
-    return `Restaurants near Hotel Vogelweiderhof:
-
-BESIDE THE HOTEL (1-3 min walk):
-Smash to Go - Food truck beside hotel, 15% discount for hotel guests
-Mr. Cevap - 1 min walk, Balkan grill
-Gasthaus Turnerwirt - 3 min walk, traditional Austrian cuisine
-
-CITY CENTER (15 minutes by Bus 21, FREE with Guest Mobility Ticket):
-Sternbräu, St. Peter (oldest restaurant in Europe), Stieglkeller, Augustinerbräu`;
-}
-
-function getSights(lang) {
-    if (lang === 'german') {
-        return `Sehenswürdigkeiten in Salzburg (15 Minuten mit Bus 21 vom Hotel, KOSTENLOS mit Gästekarte):
-
-Festung Hohensalzburg - größte erhaltene Burg Mitteleuropas
-Schloss Mirabell & Mirabellgarten - barocker Palast, Eintritt frei
-Mozarts Geburtshaus - Getreidegasse 9
-Salzburger Dom - barocke Kathedrale
-Schloss Hellbrunn - Wasserspiele (Bus 25 ab Markartplatz)
-Untersberg - 1.853m mit Seilbahn (Bus 25 ab Markartplatz)
-
-Rückfahrt zum Hotel: Bus 21 Richtung Bergheim bis Baron Schwarz Park`;
-    }
-    return `Top Sights in Salzburg (15 minutes by Bus 21 from hotel, FREE with Guest Ticket):
-
-Hohensalzburg Fortress - largest preserved castle in Central Europe
-Mirabell Palace & Gardens - baroque palace, free gardens
-Mozart's Birthplace - Getreidegasse 9
-Salzburg Cathedral - baroque cathedral
-Hellbrunn Palace - trick fountains (Bus 25 from Markartplatz)
-Untersberg Mountain - 1,853m cable car (Bus 25 from Markartplatz)
-
-Return to hotel: Bus 21 direction Bergheim to Baron Schwarz Park`;
+// ========== STATIC KNOWLEDGE BASE ==========
+function getKnowledgeBase() {
+    return {
+        busStops: {
+            "Baron Schwarz Park": {
+                location: "Hotel Vogelweiderhof bus stop, 30 meters from the hotel",
+                coordinates: "Schallmoos district"
+            },
+            "Hanuschplatz": {
+                location: "City center stop, near Old Town",
+                coordinates: "Altstadt"
+            },
+            "Salzburg Hbf": {
+                location: "Salzburg Main Train Station",
+                coordinates: "Hauptbahnhof"
+            },
+            "Markartplatz": {
+                location: "Central square in Salzburg",
+                coordinates: "Near Old Town"
+            }
+        },
+        busRoutes: {
+            "21": {
+                description: "Connects Hotel Vogelweiderhof with City Center",
+                directions: {
+                    "Fürstenbrunn": "City Center (Altstadt)",
+                    "Bergheim": "Back to Hotel area (Baron Schwarz Park)"
+                }
+            },
+            "120": {
+                description: "Connects Hotel Vogelweiderhof with Train Station",
+                directions: {
+                    "Hauptbahnhof": "Salzburg Main Train Station",
+                    "Pelting": "Back to Hotel area (Baron Schwarz Park)"
+                }
+            },
+            "121": {
+                description: "Connects Hotel Vogelweiderhof with Train Station (same route as 120)",
+                directions: {
+                    "Hauptbahnhof": "Salzburg Main Train Station",
+                    "Pelting": "Back to Hotel area (Baron Schwarz Park)"
+                }
+            },
+            "150": {
+                description: "From Train Station to Bad Ischl (connection to Hallstatt)",
+                directions: {
+                    "Bad Ischl": "Transfer to Bus 541 → Bus 543 for Hallstatt"
+                }
+            },
+            "840": {
+                description: "From Train Station to Königssee (Germany)",
+                directions: {
+                    "Jennerbahn": "Get off at 'Königssee' stop for the lake"
+                }
+            },
+            "25": {
+                description: "From Markartplatz to Hellbrunn, Zoo, Untersbergbahn",
+                directions: {
+                    "Untersbergbahn": "Hellbrunn Palace, Zoo, Untersberg cable car"
+                }
+            }
+        },
+        guestTicket: {
+            name: "Guest Mobility Ticket",
+            description: "Free public transport in Salzburg province",
+            requires: "Online check-in before arrival"
+        },
+        nearbyRestaurants: [
+            { name: "Smash to Go", location: "Beside hotel", cuisine: "Burgers", discount: "15% for hotel guests" },
+            { name: "Mr. Cevap", location: "1 min walk", cuisine: "Balkan grill" },
+            { name: "Gasthaus Turnerwirt", location: "3 min walk, across street", cuisine: "Traditional Austrian" }
+        ],
+        cityCenterRestaurants: [
+            { name: "Sternbräu", cuisine: "Traditional Austrian" },
+            { name: "St. Peter", cuisine: "Oldest restaurant in Europe" },
+            { name: "Stieglkeller", cuisine: "Austrian with Stiegl beer" },
+            { name: "Augustinerbräu", cuisine: "Monastery brewery" }
+        ],
+        sights: [
+            { name: "Hohensalzburg Fortress", description: "Largest preserved castle in Central Europe" },
+            { name: "Mirabell Palace & Gardens", description: "Baroque palace, free gardens" },
+            { name: "Mozart's Birthplace", description: "Getreidegasse 9" },
+            { name: "Salzburg Cathedral", description: "Baroque cathedral" },
+            { name: "Hellbrunn Palace", description: "Famous trick fountains" },
+            { name: "Untersberg Mountain", description: "1,853m cable car with 360° view" }
+        ]
+    };
 }
 
 // ========== CONVERSATION MEMORY ==========
 const conversationMemory = new Map();
-const userLanguagePreference = new Map();
 const userSessionStart = new Map();
 
 // ========== FAQ LOADER ==========
@@ -480,7 +318,7 @@ function loadFAQs() {
         if (stats.mtimeMs === lastFAQModified && cachedFAQ) return cachedFAQ;
         cachedFAQ = fs.readFileSync(FAQ_PATH, 'utf8');
         lastFAQModified = stats.mtimeMs;
-        console.log(`FAQ loaded`);
+        console.log(`✅ FAQ loaded`);
         return cachedFAQ;
     } catch (error) { 
         return "FAQ unavailable"; 
@@ -531,7 +369,7 @@ let botConfig = {
 
 // ========== LIMITS ==========
 let limitsConfig = {
-    maxTokensPerResponse: 450,
+    maxTokensPerResponse: 600,
     maxMessagesPerSession: 20,
     maxQuestionsPerMinute: 10,
     dailyQuota: 500,
@@ -585,22 +423,6 @@ setInterval(() => {
     }
 }, 3600000);
 
-// ========== INTENT DETECTION ==========
-function detectIntent(question) {
-    const lower = question.toLowerCase();
-    
-    if (lower.includes('wifi') || lower.includes('password') || lower.includes('internet')) return 'wifi';
-    if (/(route|weg|anfahrt|stadtzentrum|city center|zentrum|centre|wie komme ich)/i.test(question)) return 'route';
-    if (/(bus 21|bus21|21er|linie 21|abfahrtszeiten.*21)/i.test(question)) return 'bus21';
-    if (/(bus 120|bus120|120er|linie 120)/i.test(question)) return 'bus120';
-    if (/(bus 121|bus121|121er|linie 121)/i.test(question)) return 'bus121';
-    if (lower.includes('restaurant') || lower.includes('essen') || lower.includes('food')) return 'restaurants';
-    if (lower.includes('sehenswürdigkeiten') || lower.includes('sightseeing') || lower.includes('attractions')) return 'sights';
-    if (/(wetter|weather|temp|temperatur)/i.test(question)) return 'weather';
-    
-    return 'general';
-}
-
 // ========== API ENDPOINTS ==========
 app.get('/api/analytics', (req, res) => {
     const topQuestions = Array.from(analytics.mostAskedQuestions.entries())
@@ -632,7 +454,6 @@ app.post('/api/reset-session', (req, res) => {
     const userData = usageTracker.get(clientIp);
     if (userData) { userData.sessionCount = 0; }
     conversationMemory.delete(clientIp);
-    userLanguagePreference.delete(clientIp);
     res.json({ success: true });
 });
 
@@ -668,13 +489,13 @@ app.post('/api/toggle-search', (req, res) => {
     res.json({ success: true });
 });
 
-// ========== MAIN CHAT ENDPOINT ==========
+// ========== MAIN CHAT ENDPOINT - AI DOES ALL THE REASONING ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const userQuestion = req.body.userMessage;
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     
-    if (!apiKey) return res.json({ reply: "API key missing. Please contact reception." });
+    if (!apiKey) return res.json({ reply: "❌ API key missing. Please contact reception." });
     
     const rateCheck = checkRateLimit(clientIp);
     if (!rateCheck.allowed) return res.json({ reply: rateCheck.message });
@@ -683,117 +504,167 @@ app.post('/api/chat', async (req, res) => {
     
     const faqContent = loadFAQs();
     let history = conversationMemory.get(clientIp) || [];
+    const isWeekend = isWeekendOrHoliday();
     
-    // Detect language from the question - ALWAYS use detected language
-    let detectedLang = detectLanguage(userQuestion);
-    userLanguagePreference.set(clientIp, detectedLang);
+    // Fetch real-time data
+    console.log("🔄 Fetching live bus data...");
+    const busData = await getAllBusData();
+    console.log("✅ Live bus data fetched");
     
-    const intent = detectIntent(userQuestion);
-    let reply = "";
+    const weatherData = await getWeatherData();
+    const knowledgeBase = getKnowledgeBase();
     
-    try {
-        // ========== HANDLE INTENTS WITH FILTERED API RESPONSES ==========
-        
-        if (intent === 'wifi') {
-            reply = getWifiResponse(detectedLang);
-        }
-        else if (intent === 'route') {
-            reply = getCityCenterRoute(detectedLang);
-        }
-        else if (intent === 'bus21') {
-            reply = await getBus21Schedule(detectedLang);
-        }
-        else if (intent === 'bus120') {
-            reply = await getBus120Schedule(detectedLang);
-        }
-        else if (intent === 'bus121') {
-            reply = await getBus121Schedule(detectedLang);
-        }
-        else if (intent === 'restaurants') {
-            reply = getRestaurants(detectedLang);
-        }
-        else if (intent === 'sights') {
-            reply = getSights(detectedLang);
-        }
-        else if (intent === 'weather') {
-            const weatherData = await getWeather("Salzburg", detectedLang);
-            if (weatherData) {
-                reply = weatherData;
-            } else if (detectedLang === 'german') {
-                reply = "Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.";
-            } else {
-                reply = "Weather information is currently unavailable. Please check a weather app for the forecast.";
-            }
-        }
-        else {
-            // Use DeepSeek for general questions
-            const historyText = history.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n');
-            
-            const languageInstruction = detectedLang === 'german' 
-                ? "Du MUSST auf Deutsch antworten. Verwende KEIN Englisch."
-                : "You MUST respond in English. Do not use German.";
-            
-            const systemPrompt = `${languageInstruction}
+    // Build conversation history
+    const historyText = history.slice(-10).map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    
+    // The system prompt - AI does all the reasoning
+    const systemPrompt = `You are a helpful hotel assistant at Hotel Vogelweiderhof in Salzburg.
 
-You are a hotel assistant at Hotel Vogelweiderhof in Salzburg.
+========================================
+YOUR TASK
+========================================
+Understand what the guest is asking and provide helpful, accurate information. You have access to:
+1. Real-time bus departure data
+2. Current weather data
+3. FAQ and hotel information
+4. Knowledge about Salzburg
 
-HOTEL FAQ:
+========================================
+REAL-TIME BUS DATA (LIVE FROM ÖBB)
+========================================
+
+${JSON.stringify(busData, null, 2)}
+
+========================================
+WEATHER DATA (LIVE)
+========================================
+
+${weatherData ? JSON.stringify(weatherData, null, 2) : "Weather data currently unavailable"}
+
+========================================
+STATIC KNOWLEDGE BASE
+========================================
+
+${JSON.stringify(knowledgeBase, null, 2)}
+
+========================================
+HOTEL FAQ
+========================================
+
 ${faqContent}
 
-CRITICAL RULE: NEVER end your response with a question. Do not ask "Would you like...", "Can I help you...", or any other question. Just state the information and stop.
+========================================
+CONVERSATION HISTORY
+========================================
 
-CONVERSATION HISTORY:
-${historyText}
+${historyText || "No previous conversation"}
 
-GUEST: ${userQuestion}
+========================================
+CURRENT QUESTION
+========================================
 
-ASSISTANT:`;
+Guest: ${userQuestion}
 
-            const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
-                model: "deepseek-chat",
-                messages: [{ role: "user", content: systemPrompt }],
-                temperature: 0.5,
-                max_tokens: limitsConfig.maxTokensPerResponse
-            }, {
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 25000
-            });
-            
-            reply = response.data.choices[0].message.content;
-            reply = reply.replace(/\?$/, '.');
-            
-            if (response.data.usage) {
-                updateTokenAnalytics(response.data.usage);
-            }
+========================================
+INSTRUCTIONS
+========================================
+
+1. LANGUAGE: Respond in the SAME language as the guest's question. If they ask in German, respond in German. If in English, respond in English. If they switch languages, switch with them.
+
+2. BUS QUERIES: When asked about buses:
+   - Understand where the guest is (hotel? city center? train station?) from context
+   - Understand where they want to go
+   - Show ONLY relevant departures for their journey
+   - Filter bus data to show only the bus line they asked about
+   - Format departure times clearly (e.g., "20:34")
+   - Include delay information if present
+   - Mention the Guest Mobility Ticket makes the ride FREE
+
+3. LOCATION MAPPING:
+   - "Fürstenbrunn" direction = City Center (Altstadt)
+   - "Bergheim" direction = Back to Hotel area (Baron Schwarz Park)
+   - "Hauptbahnhof" = Main Train Station
+   - "Pelting" = Back to Hotel area (from train station)
+
+4. ROUTE QUERIES: When asked "how to get to X":
+   - Provide the best bus option
+   - Include direction, travel time, and bus stop location
+   - Remind about free Guest Mobility Ticket
+
+5. WEATHER QUERIES: Use the weather data above to answer
+
+6. RESTAURANT/FOOD QUERIES: Use the knowledge base
+
+7. SIGHTSEEING QUERIES: Use the knowledge base
+
+8. CRITICAL RULES:
+   - NEVER end responses with questions
+   - NEVER ask "Would you like...", "Can I help you with...", "Is there anything else..."
+   - Just state the information and stop
+   - Be warm, helpful, and concise
+   - Use bullet points or line breaks for clarity
+
+${isWeekend ? "NOTE: Today is a weekend or holiday. Bus schedules may have reduced frequency." : ""}
+
+Now, respond to the guest's question naturally and helpfully.`;
+
+    try {
+        const response = await axios.post('https://api.deepseek.com/v1/chat/completions', {
+            model: "deepseek-chat",
+            messages: [{ role: "user", content: systemPrompt }],
+            temperature: 0.5,
+            max_tokens: limitsConfig.maxTokensPerResponse
+        }, {
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            timeout: 30000
+        });
+        
+        let reply = response.data.choices[0].message.content;
+        
+        // Safety: remove any trailing question marks
+        reply = reply.replace(/\?$/, '.');
+        reply = reply.replace(/ Would you like.*$/s, '');
+        reply = reply.replace(/ Can I help.*$/s, '');
+        reply = reply.replace(/ Is there anything.*$/s, '');
+        reply = reply.replace(/ Let me know if.*$/s, '');
+        
+        if (response.data.usage) {
+            updateTokenAnalytics(response.data.usage);
         }
         
-        // Final safety: ensure no question at the end
-        reply = reply.replace(/\?$/, '.');
+        // Store in conversation memory
+        analytics.totalQuestions++;
+        const normalizedQuestion = userQuestion.toLowerCase().substring(0, 100);
+        analytics.mostAskedQuestions.set(normalizedQuestion, (analytics.mostAskedQuestions.get(normalizedQuestion) || 0) + 1);
+        
+        history.push({ role: "user", content: userQuestion.substring(0, 300) });
+        history.push({ role: "assistant", content: reply.substring(0, 800) });
+        if (history.length > 15) history.splice(0, 3);
+        conversationMemory.set(clientIp, history);
+        
+        res.json({ reply: reply });
         
     } catch (error) {
         console.error('Chat error:', error.message);
-        reply = detectedLang === 'german' 
-            ? "Ich habe gerade technische Probleme. Bitte versuchen Sie es später noch einmal."
-            : "I'm having technical difficulties. Please try again later.";
+        const errorReply = "I'm having technical difficulties. Please try again later.";
+        res.json({ reply: errorReply });
     }
-    
-    history.push({ role: "user", content: userQuestion.substring(0, 150) });
-    history.push({ role: "assistant", content: reply.substring(0, 500) });
-    if (history.length > 12) history.splice(0, 2);
-    conversationMemory.set(clientIp, history);
-    
-    res.json({ reply: reply });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`🚆 VAO/HAFAS API: ENABLED (LIVE real-time filtered departures)`);
+    console.log(`🚆 VAO/HAFAS API: ENABLED (LIVE real-time departures)`);
     console.log(`🌤️ Weather API: ENABLED (Open-Meteo)`);
-    console.log(`🌍 Language detection: AUTO - responds in guest's language`);
+    console.log(`🧠 AI-POWERED: The AI understands context, location, and language`);
+    console.log(`📦 Raw bus data provided to AI - AI decides what to show`);
+    console.log(`💾 Conversation memory: ENABLED`);
     console.log(`📋 FAQ loaded: ${loadFAQs() !== "No FAQ loaded" ? "YES" : "NO"}`);
-    console.log(`\n✅ Bus 21: Shows ONLY Bus 21 - separates city center vs other directions`);
-    console.log(`✅ Bus 120: Shows ONLY Bus 120 - highlights train station direction`);
-    console.log(`✅ Bot NEVER ends responses with questions\n`);
+    console.log(`\n✅ The AI automatically:`);
+    console.log(`   • Detects language from the question`);
+    console.log(`   • Figures out where the user is and where they want to go`);
+    console.log(`   • Filters bus departures to show only relevant direction`);
+    console.log(`   • Never ends responses with questions`);
+    console.log(`   • Uses real-time bus data live from ÖBB\n`);
 });
