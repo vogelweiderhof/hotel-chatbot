@@ -6,10 +6,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
-        
         h1 { text-align: center; margin-bottom: 10px; color: #3A5E3C; }
         
-        /* Chat Link Banner */
         .chat-link-banner {
             background: linear-gradient(135deg, #D4A373 0%, #588157 100%);
             color: white;
@@ -21,7 +19,6 @@
             margin-left: auto;
             margin-right: auto;
         }
-        .chat-link-banner h3 { margin-bottom: 10px; font-size: 1.1rem; }
         .chat-link-banner a {
             color: white;
             background: rgba(255,255,255,0.2);
@@ -33,7 +30,6 @@
             margin-top: 8px;
         }
         .chat-link-banner a:hover { background: rgba(255,255,255,0.3); }
-        .chat-link-banner small { display: block; margin-top: 8px; opacity: 0.8; font-size: 0.8rem; }
         .copy-btn {
             background: rgba(255,255,255,0.3);
             border: none;
@@ -77,7 +73,7 @@
             font-size: 12px;
         }
         
-        input, textarea, select {
+        input, textarea {
             width: 100%;
             padding: 8px 10px;
             margin-bottom: 8px;
@@ -86,11 +82,7 @@
             font-size: 13px;
         }
         
-        textarea {
-            resize: vertical;
-            font-family: monospace;
-            font-size: 11px;
-        }
+        textarea { resize: vertical; font-family: monospace; font-size: 11px; }
         
         button {
             background: #588157;
@@ -104,7 +96,6 @@
             font-size: 14px;
             font-weight: bold;
         }
-        
         button:hover { background: #3A5E3C; }
         button.success { background: #D4A373; }
         button.success:hover { background: #c49162; }
@@ -163,7 +154,7 @@
         .toggle-button.active::after { left: 27px; }
         
         .messages {
-            height: 300px;
+            height: 250px;
             overflow-y: auto;
             border: 1px solid #eee;
             padding: 10px;
@@ -208,7 +199,7 @@
             overflow-y: auto;
         }
         
-        hr { margin: 15px 0; }
+        hr { margin: 10px 0; }
         
         .analytics-number {
             font-size: 20px;
@@ -241,9 +232,7 @@
             word-break: break-all;
         }
         
-        .full-width {
-            grid-column: span 3;
-        }
+        .full-width { grid-column: span 3; }
         
         @media (max-width: 1400px) {
             .container { grid-template-columns: repeat(2, 1fr); }
@@ -258,8 +247,7 @@
 <body>
     <h1>🏨 Hotel Vogelweiderhof - AI Assistant Admin Panel</h1>
     
-    <!-- CHAT LINK BANNER -->
-    <div class="chat-link-banner" id="chatLinkBanner">
+    <div class="chat-link-banner">
         <h3>💬 Guest Chat Interface</h3>
         <a href="#" id="chatLink" target="_blank">Loading chat link...</a>
         <button class="copy-btn" onclick="copyChatLink()">📋 Copy Link</button>
@@ -267,398 +255,274 @@
     </div>
     
     <div class="container">
-        <!-- PANEL 1: INITIAL SETUP -->
+        <!-- PANEL 1: SETUP -->
         <div class="panel">
-            <h2>📥 1. Initial Setup</h2>
-            <label>Hotel Website URL (optional):</label>
-            <input type="text" id="websiteUrl" placeholder="https://direct-book.com/properties/hotelvogelweiderhof">
-            
+            <h2>📥 1. Setup</h2>
             <label>Bot Personality:</label>
-            <textarea id="personality" rows="4">You are a friendly, efficient, and trustworthy hotel front desk agent. Be warm but not overly casual. Use polite phrases like "please," "thank you," and "of course." Greet guests with time-appropriate salutations (good morning, good afternoon, good evening). Use the hotel's name naturally within the first two messages (Hotel Vogelweiderhof). Empathize before solving problems — acknowledge frustrations first. Keep responses concise (1–3 short sentences for simple queries). Never argue with a guest. Do not end answers with a question.</textarea>
+            <textarea id="personality" rows="3">Helpful hotel front desk agent at Hotel Vogelweiderhof.</textarea>
             
             <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="5">Never ask for or store full credit card numbers, CVV, or passwords. Redirect to secure booking engine for payments. Never repeat back sensitive information. Never share other guests' data including names, room numbers, or stay dates. Never log any personal data. If uncertain about an answer, say so honestly. Only provide verified information about room types, amenities, check-in/out times and WiFi. Never guarantee early check-in or upgrades. Block abusive language with one neutral warning then end the conversation. Never give medical advice or help bypass security policies. Escalate to a human agent if they express distress, safety concerns, or emergencies. Never change a reservation without authentication via booking ID and last name or a secure link. Refer to Booking Engine from hotel homepage where the guest can set dates to get up-to-date availability and prices.</textarea>
+            <textarea id="safetyRules" rows="3">No credit cards. No guest data sharing.</textarea>
             
             <label>Style Rules:</label>
-            <textarea id="styleRules" rows="5">Use sentence case only — never ALL CAPS except for brief emphasis like "NO" in policy statements. Break text into short lines, avoiding walls of text. Use line breaks between separate ideas. Use bullet points for lists of amenities, steps, or policies. Bold key information such as room type, price, or time sparingly. Never use all bold or all emojis in any message. Write dates in clear format like "24 May, 2026" not "24/05/26." Show prices with currency symbol followed by "per night" or "total." Do not correct the user's typos — answer the best guess. Maintain the same speaking style consistently throughout the conversation.</textarea>
+            <textarea id="styleRules" rows="3">Direct, helpful, warm. Never end with questions.</textarea>
             
             <button onclick="setupBot()">📥 Load Setup</button>
             <div id="status" class="status"></div>
-            <div class="rule-preview">✨ Your custom rules are pre-loaded. Click "Load Setup" to activate.</div>
         </div>
         
-        <!-- PANEL 2: LIVE RULES EDITOR -->
+        <!-- PANEL 2: LIMITS -->
         <div class="panel">
-            <h2>⚙️ 2. Edit Rules</h2>
-            <label>Personality:</label>
-            <textarea id="livePersonality" rows="3"></textarea>
-            
-            <label>Safety Rules:</label>
-            <textarea id="liveSafety" rows="3"></textarea>
-            
-            <label>Style Rules:</label>
-            <textarea id="liveStyle" rows="3"></textarea>
-            
-            <div class="toggle-switch">
-                <span class="toggle-label">🔍 Web Search (local info)</span>
-                <div id="webSearchToggle" class="toggle-button" onclick="toggleWebSearch()"></div>
-            </div>
-            
-            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
-            
-            <div class="link-hint">
-                💡 <strong>Guest Chat Link:</strong><br>
-                <span id="inlineChatLink">Loading...</span>
-            </div>
-        </div>
-        
-        <!-- PANEL 3: LIMITS CONTROL -->
-        <div class="panel">
-            <h2>🛡️ 3. Limits Control</h2>
+            <h2>🛡️ 2. Limits</h2>
             
             <div class="limit-row">
-                <label>Max tokens per response:</label>
-                <input type="number" id="maxTokens" min="50" max="500" step="10" value="150">
+                <label>Max tokens/response:</label>
+                <input type="number" id="maxTokens" min="50" max="600" step="10" value="450">
                 <span>tokens</span>
             </div>
             
             <div class="limit-row">
-                <label>Max messages per session:</label>
-                <input type="number" id="maxSession" min="5" max="50" step="1" value="15">
+                <label>Max messages/session:</label>
+                <input type="number" id="maxSession" min="5" max="50" step="1" value="20">
                 <span>messages</span>
             </div>
             
             <div class="limit-row">
-                <label>Max questions per minute:</label>
-                <input type="number" id="maxPerMinute" min="5" max="30" step="1" value="10">
-                <span>/minute</span>
+                <label>Max questions/minute:</label>
+                <input type="number" id="maxMinute" min="5" max="30" step="1" value="10">
+                <span>/min</span>
             </div>
             
             <div class="limit-row">
-                <label>Daily quota per user:</label>
+                <label>Daily quota:</label>
                 <input type="number" id="dailyQuota" min="20" max="1000" step="10" value="500">
-                <span>questions/day</span>
-            </div>
-            
-            <div class="toggle-switch">
-                <span class="toggle-label">🚫 Topic Filter</span>
-                <div id="topicFilterToggle" class="toggle-button" onclick="toggleTopicFilter()"></div>
+                <span>questions</span>
             </div>
             
             <button onclick="saveLimits()" class="success">💾 Save Limits</button>
             <button onclick="loadLimits()">🔄 Refresh</button>
             
-            <div class="current-values" id="limitsDisplay">
-                <strong>Current Limits:</strong><br>
-                Loading...
-            </div>
+            <div class="current-values" id="limitsDisplay">Loading...</div>
         </div>
         
-        <!-- PANEL 4: TEST CHAT -->
+        <!-- PANEL 3: TEST CHAT -->
         <div class="panel">
-            <h2>💬 4. Test Chat</h2>
+            <h2>💬 3. Test Chat</h2>
             <div class="messages" id="messages">
-                <div class="bot-msg">👋 Test your bot here. Changes apply immediately.</div>
+                <div class="bot-msg">👋 Test your bot here.</div>
             </div>
-            <input type="text" id="question" placeholder="Type a test question..." onkeypress="if(event.key==='Enter') sendMessage()">
-            <button onclick="sendMessage()">Send</button>
+            <input type="text" id="question" placeholder="Type a test question..." onkeypress="if(event.key==='Enter') sendTestMessage()">
+            <button onclick="sendTestMessage()">Send</button>
         </div>
         
-        <!-- PANEL 5: ANALYTICS (Questions, Languages, Sessions) -->
+        <!-- PANEL 4: ANALYTICS -->
         <div class="panel">
-            <h2>📊 5. Analytics</h2>
+            <h2>📊 4. Analytics</h2>
             <div id="analyticsDisplay">
                 <div class="info-bg" style="padding: 10px; text-align: center;">Loading analytics...</div>
             </div>
-            <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh Analytics</button>
-            <div class="current-values" style="margin-top: 10px;">
-                <small>📈 Data refreshes automatically every 30 seconds</small>
-            </div>
+            <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh</button>
         </div>
         
-        <!-- PANEL 6: TOKEN ANALYTICS & COSTS -->
+        <!-- PANEL 5: TOKEN ANALYTICS -->
         <div class="panel">
-            <h2>💰 6. Token Analytics & Costs</h2>
+            <h2>💰 5. Token Analytics</h2>
             <div id="tokenAnalyticsDisplay">
                 <div class="info-bg" style="padding: 10px; text-align: center;">Loading token analytics...</div>
             </div>
-            <button onclick="refreshTokenAnalytics()" style="background: #D4A373;">🔄 Refresh Token Stats</button>
+            <button onclick="refreshTokenAnalytics()" style="background: #D4A373;">🔄 Refresh</button>
             <div class="current-values" style="margin-top: 10px;">
-                <small>💡 DeepSeek cost: ~$0.20 per 1M tokens<br>Track your spending in real-time</small>
+                <small>💡 DeepSeek cost: ~$0.20 per 1M tokens</small>
             </div>
         </div>
     </div>
     
     <script>
-        // Global variables
-        let botReady = false;
-        let webSearchEnabled = true;
-        let topicFilterEnabled = true;
-        
         // ========== CHAT LINK ==========
         function getChatLink() {
-            const currentUrl = window.location.href;
-            const baseUrl = currentUrl.split('/').slice(0, 3).join('/');
-            return baseUrl + '/chat.html';
+            const url = window.location.href.split('/').slice(0, 3).join('/');
+            return url + '/chat.html';
         }
         
-        function updateChatLinkDisplay() {
-            const chatLink = getChatLink();
-            const chatLinkElement = document.getElementById('chatLink');
-            const inlineChatLink = document.getElementById('inlineChatLink');
-            if (chatLinkElement) {
-                chatLinkElement.href = chatLink;
-                chatLinkElement.textContent = chatLink;
-            }
-            if (inlineChatLink) {
-                inlineChatLink.innerHTML = `<a href="${chatLink}" target="_blank">${chatLink}</a>`;
-            }
+        function updateChatLink() {
+            const link = getChatLink();
+            document.getElementById('chatLink').href = link;
+            document.getElementById('chatLink').textContent = link;
         }
         
         function copyChatLink() {
-            const chatLink = getChatLink();
-            navigator.clipboard.writeText(chatLink).then(() => {
+            const link = getChatLink();
+            navigator.clipboard.writeText(link).then(() => {
                 const btn = document.querySelector('.copy-btn');
-                const originalText = btn.textContent;
                 btn.textContent = '✅ Copied!';
-                setTimeout(() => { btn.textContent = originalText; }, 2000);
+                setTimeout(() => btn.textContent = '📋 Copy Link', 2000);
             });
         }
         
-        // ========== ANALYTICS ==========
-        async function refreshAnalytics() {
+        // ========== SETUP ==========
+        async function setupBot() {
+            const data = {
+                personality: document.getElementById('personality').value,
+                safetyRules: document.getElementById('safetyRules').value,
+                styleRules: document.getElementById('styleRules').value
+            };
+            const status = document.getElementById('status');
+            status.innerHTML = '<div class="info-bg">⏳ Setting up...</div>';
+            
             try {
-                const response = await fetch('/api/analytics');
-                const data = await response.json();
-                document.getElementById('analyticsDisplay').innerHTML = `
-                    <div class="analytics-row"><strong>📊 Total Questions</strong> <span class="analytics-number">${data.totalQuestions || 0}</span></div>
-                    <div class="analytics-row"><strong>👥 Active Sessions Today</strong> <span>${data.activeSessionsToday || 0}</span></div>
-                    <div class="analytics-row"><strong>🔍 Web Searches</strong> <span>${data.webSearchUsage || 0}</span></div>
-                    <div class="analytics-row"><strong>🚫 Blocked Questions</strong> <span>${data.blockedQuestions || 0}</span></div>
-                    <div class="analytics-row"><strong>⏱️ Uptime</strong> <span>${data.uptimeHours || 0} hours</span></div>
-                    <hr>
-                    <strong>🌍 Languages</strong>
-                    ${Object.entries(data.questionsByLanguage || {}).filter(([k,v]) => v > 0).map(([lang, count]) => `<div class="analytics-row">• ${lang} <span>${count}</span></div>`).join('') || '<div>No data yet</div>'}
-                    <hr>
-                    <strong>📂 Categories</strong>
-                    ${Object.entries(data.questionsByCategory || {}).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${count}</span></div>`).join('')}
-                    <hr>
-                    <strong>🔥 Top 10 Questions</strong>
-                    ${(data.topQuestions || []).slice(0, 10).map(q => `<div class="analytics-row">• "${q.question.substring(0, 45)}..." <span>${q.count}×</span></div>`).join('') || '<div>No questions yet</div>'}
-                `;
+                const res = await fetch('/api/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    status.innerHTML = '<div class="success-bg">✅ Setup complete!</div>';
+                } else {
+                    status.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
+                }
             } catch(e) {
-                document.getElementById('analyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading analytics</div>';
+                status.innerHTML = '<div class="error-bg">❌ Connection error</div>';
             }
         }
         
-        // ========== TOKEN ANALYTICS ==========
-        async function refreshTokenAnalytics() {
-            try {
-                const response = await fetch('/api/analytics');
-                const data = await response.json();
-                const token = data.tokenAnalytics || {};
-                
-                document.getElementById('tokenAnalyticsDisplay').innerHTML = `
-                    <div class="analytics-row"><strong>💰 Estimated Cost</strong> <span class="analytics-number">$${token.estimatedCostUSD || '0.0000'}</span></div>
-                    <div class="analytics-row"><strong>🎯 Total Tokens Used</strong> <span>${(token.totalTokens || 0).toLocaleString()}</span></div>
-                    <div class="analytics-row"><strong>📥 Prompt Tokens</strong> <span>${(token.totalPromptTokens || 0).toLocaleString()}</span></div>
-                    <div class="analytics-row"><strong>📤 Completion Tokens</strong> <span>${(token.totalCompletionTokens || 0).toLocaleString()}</span></div>
-                    <div class="analytics-row"><strong>📊 Avg Tokens/Question</strong> <span>${token.averageTokensPerQuestion || 0}</span></div>
-                    <hr>
-                    <strong>📂 Tokens by Category</strong>
-                    ${Object.entries(token.tokenUsageByCategory || {}).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${(count || 0).toLocaleString()}</span></div>`).join('') || '<div>No data yet</div>'}
-                    <hr>
-                    <strong>📈 Recent Usage (last 5)</strong>
-                    ${(token.recentTokenUsage || []).slice(-5).reverse().map(t => `<div class="analytics-row">• ${t.timestamp?.substring(5, 16)} | ${t.totalTokens} tokens | $${t.cost} | ${t.category || 'other'}</div>`).join('') || '<div>No recent activity</div>'}
-                `;
-            } catch(e) {
-                document.getElementById('tokenAnalyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading token analytics</div>';
-            }
-        }
-        
-        // ========== LIMITS FUNCTIONS ==========
+        // ========== LIMITS ==========
         async function loadLimits() {
             try {
-                const response = await fetch('/api/limits');
-                const limits = await response.json();
-                document.getElementById('maxTokens').value = limits.maxTokensPerResponse;
-                document.getElementById('maxSession').value = limits.maxMessagesPerSession;
-                document.getElementById('maxPerMinute').value = limits.maxQuestionsPerMinute;
-                document.getElementById('dailyQuota').value = limits.dailyQuota;
-                topicFilterEnabled = limits.topicFilterEnabled;
-                updateTopicFilterToggle();
+                const res = await fetch('/api/limits');
+                const limits = await res.json();
+                document.getElementById('maxTokens').value = limits.maxTokens || 450;
+                document.getElementById('maxSession').value = limits.maxSession || 20;
+                document.getElementById('maxMinute').value = limits.maxMinute || 10;
+                document.getElementById('dailyQuota').value = limits.dailyQuota || 500;
                 displayLimits();
             } catch(e) { console.error('Failed to load limits', e); }
         }
         
         async function saveLimits() {
             const limits = {
-                maxTokensPerResponse: parseInt(document.getElementById('maxTokens').value),
-                maxMessagesPerSession: parseInt(document.getElementById('maxSession').value),
-                maxQuestionsPerMinute: parseInt(document.getElementById('maxPerMinute').value),
-                dailyQuota: parseInt(document.getElementById('dailyQuota').value),
-                topicFilterEnabled: topicFilterEnabled
+                maxTokens: parseInt(document.getElementById('maxTokens').value),
+                maxSession: parseInt(document.getElementById('maxSession').value),
+                maxMinute: parseInt(document.getElementById('maxMinute').value),
+                dailyQuota: parseInt(document.getElementById('dailyQuota').value)
             };
             try {
-                const response = await fetch('/api/limits', {
+                const res = await fetch('/api/limits', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(limits)
                 });
-                const data = await response.json();
+                const data = await res.json();
                 if (data.success) {
-                    addMessage('bot', '✅ Limits saved!');
                     displayLimits();
+                    addTestMessage('bot', '✅ Limits saved!');
                 }
-            } catch(e) { addMessage('bot', '❌ Error saving limits'); }
+            } catch(e) { addTestMessage('bot', '❌ Error saving limits'); }
         }
         
         function displayLimits() {
-            const tokens = document.getElementById('maxTokens').value;
-            const session = document.getElementById('maxSession').value;
-            const minute = document.getElementById('maxPerMinute').value;
-            const daily = document.getElementById('dailyQuota').value;
+            const t = document.getElementById('maxTokens').value;
+            const s = document.getElementById('maxSession').value;
+            const m = document.getElementById('maxMinute').value;
+            const d = document.getElementById('dailyQuota').value;
             document.getElementById('limitsDisplay').innerHTML = `
                 <strong>Current Limits:</strong><br>
-                • Tokens/response: ${tokens}<br>
-                • Messages/session: ${session}<br>
-                • Questions/minute: ${minute}<br>
-                • Daily quota: ${daily}<br>
-                • Topic Filter: ${topicFilterEnabled ? '✅ ON' : '❌ OFF'}
+                • Tokens/response: ${t}<br>
+                • Messages/session: ${s}<br>
+                • Questions/minute: ${m}<br>
+                • Daily quota: ${d}
             `;
         }
         
-        function updateTopicFilterToggle() {
-            const toggle = document.getElementById('topicFilterToggle');
-            if (topicFilterEnabled) toggle.classList.add('active');
-            else toggle.classList.remove('active');
-        }
-        
-        function toggleTopicFilter() {
-            topicFilterEnabled = !topicFilterEnabled;
-            updateTopicFilterToggle();
-            displayLimits();
-            addMessage('bot', `🚫 Topic filter ${topicFilterEnabled ? 'enabled' : 'disabled'}`);
-        }
-        
-        // ========== WEB SEARCH TOGGLE ==========
-        function updateWebSearchToggle() {
-            const toggle = document.getElementById('webSearchToggle');
-            if (webSearchEnabled) toggle.classList.add('active');
-            else toggle.classList.remove('active');
-        }
-        
-        async function toggleWebSearch() {
-            webSearchEnabled = !webSearchEnabled;
-            updateWebSearchToggle();
-            await fetch('/api/toggle-search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: webSearchEnabled })
-            });
-            addMessage('bot', `🔍 Web search ${webSearchEnabled ? 'enabled' : 'disabled'}`);
-        }
-        
-        // ========== SETUP FUNCTIONS ==========
-        async function setupBot() {
-            const websiteUrl = document.getElementById('websiteUrl').value;
-            const personality = document.getElementById('personality').value;
-            const safetyRules = document.getElementById('safetyRules').value;
-            const styleRules = document.getElementById('styleRules').value;
-            const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = '<div class="info-bg">⏳ Setting up...</div>';
-            
-            try {
-                const response = await fetch('/api/setup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ websiteUrl, personality, safetyRules, styleRules })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    botReady = true;
-                    statusDiv.innerHTML = '<div class="success-bg">✅ Bot ready!</div>';
-                    document.getElementById('livePersonality').value = personality;
-                    document.getElementById('liveSafety').value = safetyRules;
-                    document.getElementById('liveStyle').value = styleRules;
-                    addMessage('bot', 'Setup complete! Bot is ready.');
-                    loadCurrentRules();
-                } else {
-                    statusDiv.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
-                }
-            } catch(e) { statusDiv.innerHTML = '<div class="error-bg">❌ Connection error</div>'; }
-        }
-        
-        async function updateRulesOnly() {
-            const personality = document.getElementById('livePersonality').value;
-            const safetyRules = document.getElementById('liveSafety').value;
-            const styleRules = document.getElementById('liveStyle').value;
-            await fetch('/api/update-rules', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ personality, safetyRules, styleRules, webSearchEnabled })
-            });
-            addMessage('bot', '✨ Rules updated!');
-            loadCurrentRules();
-        }
-        
-        async function loadCurrentRules() {
-            try {
-                const response = await fetch('/api/get-rules');
-                const rules = await response.json();
-                document.getElementById('livePersonality').value = rules.personality;
-                document.getElementById('liveSafety').value = rules.safetyRules;
-                document.getElementById('liveStyle').value = rules.styleRules;
-                webSearchEnabled = rules.webSearchEnabled;
-                updateWebSearchToggle();
-            } catch(e) {}
-        }
-        
-        // ========== CHAT FUNCTIONS ==========
-        async function sendMessage() {
+        // ========== TEST CHAT ==========
+        async function sendTestMessage() {
             const input = document.getElementById('question');
-            const question = input.value.trim();
-            if (!question) return;
-            addMessage('user', question);
+            const q = input.value.trim();
+            if (!q) return;
+            addTestMessage('user', q);
             input.value = '';
-            addMessage('bot', '🤔 Thinking...');
+            addTestMessage('bot', '🤔 Thinking...');
             
             try {
-                const response = await fetch('/api/chat', {
+                const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userMessage: question })
+                    body: JSON.stringify({ userMessage: q })
                 });
-                const data = await response.json();
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', data.reply || 'No response');
+                const data = await res.json();
+                const msgs = document.getElementById('messages');
+                msgs.removeChild(msgs.lastChild);
+                addTestMessage('bot', data.reply || 'No response');
             } catch(e) {
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.removeChild(messagesDiv.lastChild);
-                addMessage('bot', '❌ Error');
+                const msgs = document.getElementById('messages');
+                msgs.removeChild(msgs.lastChild);
+                addTestMessage('bot', '❌ Error');
             }
         }
         
-        function addMessage(sender, text) {
-            const messagesDiv = document.getElementById('messages');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = sender === 'user' ? 'user-msg' : 'bot-msg';
-            msgDiv.textContent = text;
-            messagesDiv.appendChild(msgDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        function addTestMessage(sender, text) {
+            const div = document.getElementById('messages');
+            const msg = document.createElement('div');
+            msg.className = sender === 'user' ? 'user-msg' : 'bot-msg';
+            msg.textContent = text;
+            div.appendChild(msg);
+            div.scrollTop = div.scrollHeight;
         }
         
-        // ========== INITIALIZE ==========
-        updateChatLinkDisplay();
+        // ========== ANALYTICS ==========
+        async function refreshAnalytics() {
+            try {
+                const res = await fetch('/api/analytics');
+                const data = await res.json();
+                const token = data.token || {};
+                
+                document.getElementById('analyticsDisplay').innerHTML = `
+                    <div class="analytics-row"><strong>📊 Total Questions</strong> <span class="analytics-number">${data.q || 0}</span></div>
+                    <div class="analytics-row"><strong>👥 Active Sessions Today</strong> <span>${data.sessions || 0}</span></div>
+                    <hr>
+                    <div class="analytics-row"><strong>💰 Estimated Cost</strong> <span class="analytics-number">$${token.cost || '0.0000'}</span></div>
+                    <div class="analytics-row"><strong>🎯 Total Tokens</strong> <span>${(token.tk || 0).toLocaleString()}</span></div>
+                    <hr>
+                    <strong>🔥 Top Questions</strong>
+                    ${(data.topQ || []).slice(0, 10).map(q => `<div class="analytics-row">• "${q.q.substring(0, 40)}..." <span>${q.c}×</span></div>`).join('') || '<div>No questions yet</div>'}
+                `;
+            } catch(e) {
+                document.getElementById('analyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading analytics</div>';
+            }
+        }
+        
+        async function refreshTokenAnalytics() {
+            try {
+                const res = await fetch('/api/analytics');
+                const data = await res.json();
+                const token = data.token || {};
+                
+                document.getElementById('tokenAnalyticsDisplay').innerHTML = `
+                    <div class="analytics-row"><strong>💰 Estimated Cost</strong> <span class="analytics-number">$${token.cost || '0.0000'}</span></div>
+                    <div class="analytics-row"><strong>🎯 Total Tokens Used</strong> <span>${(token.tk || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📥 Prompt Tokens</strong> <span>${(token.pt || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📤 Completion Tokens</strong> <span>${(token.ct || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📊 Avg Tokens/Question</strong> <span>${token.avg || 0}</span></div>
+                    <hr>
+                    <strong>📂 Tokens by Category</strong>
+                    ${Object.entries(token.byCat || {}).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${(count || 0).toLocaleString()}</span></div>`).join('') || '<div>No data yet</div>'}
+                    <hr>
+                    <strong>📈 Recent Usage</strong>
+                    ${(token.recent || []).slice(0, 5).map(t => `<div class="analytics-row">• ${t.ts?.substring(5, 16)} | ${t.tk} tokens | $${t.cost} | ${t.cat || 'other'}</div>`).join('') || '<div>No recent activity</div>'}
+                `;
+            } catch(e) {
+                document.getElementById('tokenAnalyticsDisplay').innerHTML = '<div class="error-bg" style="padding: 10px;">Error loading token analytics</div>';
+            }
+        }
+        
+        // ========== INIT ==========
+        updateChatLink();
         loadLimits();
-        loadCurrentRules();
         refreshAnalytics();
         refreshTokenAnalytics();
-        
-        setInterval(updateChatLinkDisplay, 1000);
+        setInterval(updateChatLink, 5000);
         setInterval(refreshAnalytics, 30000);
-        setInterval(refreshTokenAnalytics, 30000);
+        setInterval(refreshTokenAnalytics, 60000);
     </script>
 </body>
 </html>
