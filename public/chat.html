@@ -32,41 +32,33 @@
         .chat-header {
             background: #3A5E3C;
             color: white;
-            padding: 20px;
+            padding: 15px 20px;
             text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
         }
         
         .hotel-logo {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             object-fit: cover;
-            margin-bottom: 5px;
         }
         
-        .chat-header h1 {
-            font-size: 1.3rem;
-            margin-bottom: 5px;
-        }
-        
-        .chat-header p {
-            font-size: 0.7rem;
-            opacity: 0.9;
-        }
+        .chat-header h1 { font-size: 1.1rem; }
+        .chat-header p { font-size: 0.65rem; opacity: 0.9; }
         
         .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 15px;
             background: #FAF7F0;
         }
         
         .message {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             display: flex;
             flex-direction: column;
         }
@@ -75,8 +67,8 @@
         
         .bubble {
             max-width: 80%;
-            padding: 12px 16px;
-            border-radius: 20px;
+            padding: 10px 14px;
+            border-radius: 18px;
             line-height: 1.5;
             font-size: 14px;
             white-space: pre-wrap;
@@ -93,25 +85,25 @@
             background: white;
             color: #333;
             border-bottom-left-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
         }
         
         .feedback-buttons {
             display: flex;
-            gap: 8px;
-            margin-top: 5px;
+            gap: 6px;
+            margin-top: 4px;
             margin-left: 10px;
-            opacity: 0.5;
+            opacity: 0.4;
             transition: opacity 0.2s;
         }
         .feedback-buttons:hover { opacity: 1; }
         .feedback-btn {
             background: none;
             border: none;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
-            padding: 2px 8px;
-            border-radius: 12px;
+            padding: 2px 6px;
+            border-radius: 10px;
         }
         .feedback-btn.good { color: #588157; }
         .feedback-btn.bad { color: #D4A373; }
@@ -120,14 +112,14 @@
         .quick-replies {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 12px;
+            gap: 6px;
+            margin-top: 10px;
         }
         .quick-chip {
             background: #E8DCC8;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 11px;
             cursor: pointer;
             transition: background 0.2s;
             color: #3A5E3C;
@@ -139,66 +131,60 @@
         
         .input-area {
             display: flex;
-            padding: 15px;
+            padding: 10px 15px;
             background: white;
             border-top: 1px solid #E8DCC8;
-            gap: 10px;
+            gap: 8px;
         }
         
         .input-area input {
             flex: 1;
-            padding: 12px;
+            padding: 10px 14px;
             border: 1px solid #E8DCC8;
-            border-radius: 25px;
+            border-radius: 20px;
             font-size: 14px;
             outline: none;
         }
-        
-        .input-area input:focus {
-            border-color: #D4A373;
-        }
+        .input-area input:focus { border-color: #D4A373; }
         
         .input-area button {
             background: #588157;
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
+            padding: 10px 16px;
+            border-radius: 20px;
             cursor: pointer;
             font-size: 14px;
-            transition: background 0.2s;
         }
-        .input-area button:hover {
-            background: #3A5E3C;
-        }
+        .input-area button:hover { background: #3A5E3C; }
         
         .typing {
             color: #999;
             font-size: 12px;
-            padding: 10px 20px;
+            padding: 8px 20px;
             font-style: italic;
         }
         
-        /* Floating Bus Timer Overlay - Top Left Corner */
+        /* Floating Overlay - Top Left */
         .bus-overlay {
             position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 260px;
+            top: 15px;
+            left: 15px;
+            width: 250px;
             background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.12);
             z-index: 1000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
             border: 1px solid #E8DCC8;
+            font-size: 12px;
         }
         
         .bus-overlay-header {
             background: #3A5E3C;
             color: white;
-            padding: 8px 10px;
-            font-size: 12px;
+            padding: 6px 10px;
+            font-size: 11px;
             font-weight: bold;
             display: flex;
             justify-content: space-between;
@@ -210,68 +196,81 @@
             background: none;
             border: none;
             color: white;
-            font-size: 14px;
+            font-size: 13px;
             cursor: pointer;
             padding: 0 4px;
         }
         
         .bus-overlay-content {
-            padding: 8px;
-            max-height: 350px;
+            padding: 8px 10px;
+            max-height: 400px;
             overflow-y: auto;
             display: block;
         }
+        .bus-overlay-content.collapsed { display: none; }
         
-        .bus-overlay-content.collapsed {
-            display: none;
+        /* Weather Section */
+        .weather-section {
+            background: #f8f5f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            text-align: center;
         }
+        .weather-section .temp {
+            font-size: 20px;
+            font-weight: bold;
+            color: #3A5E3C;
+        }
+        .weather-section .condition {
+            font-size: 12px;
+            color: #666;
+        }
+        .weather-forecast {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 5px;
+            font-size: 10px;
+            color: #555;
+        }
+        .weather-forecast .day {
+            text-align: center;
+        }
+        .weather-forecast .day .high { color: #D4A373; font-weight: bold; }
+        .weather-forecast .day .low { color: #888; }
         
         .bus-line {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             border-bottom: 1px solid #eee;
             padding-bottom: 8px;
         }
-        
         .bus-line h4 {
-            margin: 0 0 8px 0;
-            font-size: 12px;
+            margin: 0 0 5px 0;
+            font-size: 11px;
             color: #3A5E3C;
         }
-        
         .bus-departure {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 5px 0;
+            padding: 3px 0;
             font-size: 12px;
             border-bottom: 1px dashed #f0f0f0;
         }
-        
         .bus-time {
             font-weight: bold;
             color: #D4A373;
             font-size: 14px;
         }
-        
-        .bus-direction {
-            color: #666;
-            font-size: 11px;
-            flex: 1;
-            text-align: right;
-            margin-left: 8px;
-        }
-        
         .bus-delay {
             color: #e74c3c;
             font-size: 10px;
-            margin-left: 5px;
         }
         
         .bus-last-updated {
             font-size: 9px;
             color: #999;
             text-align: center;
-            margin-top: 8px;
+            margin-top: 6px;
             padding-top: 5px;
             border-top: 1px solid #eee;
         }
@@ -280,41 +279,31 @@
             background: #D4A373;
             border: none;
             color: white;
-            padding: 4px 8px;
-            border-radius: 15px;
+            padding: 3px 8px;
+            border-radius: 12px;
             font-size: 10px;
             cursor: pointer;
-            margin-top: 6px;
+            margin-top: 5px;
             width: 100%;
         }
+        .refresh-btn:hover { background: #c49162; }
         
-        .refresh-btn:hover {
-            background: #c49162;
-        }
-        
-        .loading-bus {
+        .loading-bus, .error-bus {
             text-align: center;
             color: #999;
             font-size: 11px;
-            padding: 10px;
+            padding: 8px;
         }
-        
-        .error-bus {
-            text-align: center;
-            color: #e74c3c;
-            font-size: 11px;
-            padding: 10px;
-        }
+        .error-bus { color: #e74c3c; }
         
         @media (max-width: 600px) {
             body { padding: 0; }
-            .chat-container { height: 100vh; border-radius: 0; max-width: 100%; }
-            .bubble { max-width: 85%; font-size: 15px; }
-            .bus-overlay { 
-                width: 220px; 
-                top: 10px; 
-                left: 10px;
-            }
+            .chat-container { height: 100vh; border-radius: 0; }
+            .bus-overlay { width: 210px; top: 10px; left: 10px; }
+            .bus-overlay-header { font-size: 10px; padding: 5px 8px; }
+            .weather-section .temp { font-size: 17px; }
+            .weather-forecast { font-size: 9px; }
+            .bus-time { font-size: 12px; }
         }
     </style>
 </head>
@@ -322,10 +311,9 @@
     <div class="chat-container">
         <div class="chat-header">
             <img src="/images/logo.png" class="hotel-logo" alt="Hotel Vogelweiderhof Logo" 
-                 onerror="this.style.display='none'; this.nextSibling.style.display='flex';"
-                 style="display: block;">
-            <div style="width: 60px; height: 60px; background: #D4A373; border-radius: 50%; display: none; align-items: center; justify-content: center; margin-bottom: 5px;">
-                <span style="font-size: 30px;">🏨</span>
+                 onerror="this.style.display='none'; this.nextSibling.style.display='flex';">
+            <div style="width: 50px; height: 50px; background: #D4A373; border-radius: 50%; display: none; align-items: center; justify-content: center;">
+                <span style="font-size: 26px;">🏨</span>
             </div>
             <h1>Hotel Vogelweiderhof</h1>
             <p>Economical comfort in Salzburg City</p>
@@ -333,291 +321,236 @@
         
         <div class="messages" id="messages">
             <div class="message bot">
-                <div class="bubble">🏔️ Welcome to Hotel Vogelweiderhof, your economical hotel in Salzburg City!
+                <div class="bubble">🏔️ Welcome to Hotel Vogelweiderhof!
 
-I'm your AI assistant. I can help you with:
+I'm your AI assistant. I can help with:
 • Check-in/out times
 • WiFi password
-• Breakfast hours & cost
+• Breakfast hours
 • Parking
-• Local restaurants, weather & directions
+• Restaurants, weather & directions
 • And more!
 
 🌍 Just ask in your language!</div>
                 <div class="quick-replies">
-                    <span class="quick-chip" onclick="sendSuggested('What time is check-in?')">🇬🇧 Check-in</span>
-                    <span class="quick-chip" onclick="sendSuggested('Wie spät ist Check-in?')">🇩🇪 Check-in Zeit</span>
+                    <span class="quick-chip" onclick="sendSuggested('Check-in time?')">📅 Check-in</span>
                     <span class="quick-chip" onclick="sendSuggested('WiFi password?')">📶 WiFi</span>
                     <span class="quick-chip" onclick="sendSuggested('Breakfast hours?')">🍳 Breakfast</span>
-                    <span class="quick-chip" onclick="sendSuggested('Weather in Salzburg?')">🌤️ Weather</span>
                     <span class="quick-chip" onclick="sendSuggested('How to get to old town?')">🚗 Directions</span>
-                    <span class="quick-chip" onclick="sendSuggested('早餐时间是什么时候？')">🇨🇳 早餐</span>
                 </div>
             </div>
         </div>
         
         <div class="input-area">
-            <input type="text" id="question" placeholder="Type your question... / Geben Sie Ihre Frage ein..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <input type="text" id="question" placeholder="Ask me anything..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button onclick="sendMessage()">Send</button>
         </div>
-        <div id="typing" class="typing" style="display: none;">🤖 Assistant is thinking...</div>
+        <div id="typing" class="typing" style="display: none;">🤖 Thinking...</div>
     </div>
     
-    <!-- Floating Bus Timer Overlay -->
+    <!-- Floating Overlay -->
     <div class="bus-overlay" id="busOverlay">
-        <div class="bus-overlay-header" onclick="toggleBusOverlay()">
-            <span>🚌 Live Bus Times</span>
+        <div class="bus-overlay-header" onclick="toggleOverlay()">
+            <span>🚌 Live Times</span>
             <button class="toggle-btn" id="toggleBtn">−</button>
         </div>
-        <div class="bus-overlay-content" id="busOverlayContent">
-            <div id="busTimes">
+        <div class="bus-overlay-content" id="overlayContent">
+            <div id="weatherDisplay">
+                <div class="loading-bus">Loading weather...</div>
+            </div>
+            <div id="busDisplay">
                 <div class="loading-bus">Loading bus times...</div>
             </div>
-            <button class="refresh-btn" onclick="fetchLiveBusTimes()">🔄 Refresh</button>
-            <div class="bus-last-updated" id="lastUpdated">Last updated: --:--:--</div>
+            <button class="refresh-btn" onclick="fetchAllData()">🔄 Refresh</button>
+            <div class="bus-last-updated" id="lastUpdated">Updated: --:--:--</div>
         </div>
     </div>
     
     <script>
-        let busUpdateInterval = null;
+        let overlayInterval = null;
+        let weatherData = null;
+        let busData = null;
         
         // ========== CHAT FUNCTIONS ==========
         async function sendMessage() {
             const input = document.getElementById('question');
-            const question = input.value.trim();
-            if (!question) return;
-            
-            addMessage('user', question);
+            const q = input.value.trim();
+            if (!q) return;
+            addMessage('user', q);
             input.value = '';
             document.getElementById('typing').style.display = 'block';
-            scrollToBottom();
             
             try {
-                const response = await fetch('/api/chat', {
+                const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userMessage: question })
+                    body: JSON.stringify({ userMessage: q })
                 });
-                const data = await response.json();
+                const data = await res.json();
                 document.getElementById('typing').style.display = 'none';
-                addMessageWithFeedback('bot', data.reply || 'Sorry, no response.', question);
-            } catch (error) {
+                addMessage('bot', data.reply || 'No response.');
+            } catch (e) {
                 document.getElementById('typing').style.display = 'none';
-                addMessage('bot', '❌ Connection error. Please try again.');
+                addMessage('bot', '❌ Connection error.');
             }
         }
         
-        function sendSuggested(question) {
-            document.getElementById('question').value = question;
+        function sendSuggested(q) {
+            document.getElementById('question').value = q;
             sendMessage();
         }
         
         function addMessage(sender, text) {
-            const messagesDiv = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}`;
+            const div = document.getElementById('messages');
+            const msg = document.createElement('div');
+            msg.className = `message ${sender}`;
             const bubble = document.createElement('div');
             bubble.className = 'bubble';
             bubble.innerHTML = text.replace(/\n/g, '<br>');
-            messageDiv.appendChild(bubble);
-            messagesDiv.appendChild(messageDiv);
-            scrollToBottom();
-            return messageDiv;
+            msg.appendChild(bubble);
+            div.appendChild(msg);
+            div.scrollTop = div.scrollHeight;
         }
         
-        async function sendFeedback(rating, question, answer) {
-            try {
-                await fetch('/api/feedback', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rating, question, answer })
-                });
-                const feedbackDiv = document.querySelector(`.feedback-buttons[data-question="${question.replace(/'/g, '')}"]`);
-                if (feedbackDiv) feedbackDiv.innerHTML = '<span class="feedback-sent">Thanks for your feedback! 🙏</span>';
-            } catch(e) {}
-        }
+        // ========== OVERLAY FUNCTIONS ==========
         
-        function addMessageWithFeedback(sender, text, question) {
-            const messagesDiv = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}`;
-            
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.innerHTML = text.replace(/\n/g, '<br>');
-            messageDiv.appendChild(bubble);
-            
-            if (sender === 'bot') {
-                const feedbackDiv = document.createElement('div');
-                feedbackDiv.className = 'feedback-buttons';
-                feedbackDiv.setAttribute('data-question', question.substring(0, 50));
-                feedbackDiv.innerHTML = `
-                    <button class="feedback-btn good" onclick="sendFeedback('good', '${question.replace(/'/g, "\\'")}', '${text.replace(/'/g, "\\'").substring(0, 100)}')">👍 Helpful</button>
-                    <button class="feedback-btn bad" onclick="sendFeedback('bad', '${question.replace(/'/g, "\\'")}', '${text.replace(/'/g, "\\'").substring(0, 100)}')">👎 Not helpful</button>
-                `;
-                messageDiv.appendChild(feedbackDiv);
-            }
-            
-            messagesDiv.appendChild(messageDiv);
-            scrollToBottom();
-        }
-        
-        function scrollToBottom() {
-            const messagesDiv = document.getElementById('messages');
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
-        
-        // ========== FLOATING BUS OVERLAY FUNCTIONS ==========
-        
-        function toggleBusOverlay() {
-            const content = document.getElementById('busOverlayContent');
-            const toggleBtn = document.getElementById('toggleBtn');
-            
+        function toggleOverlay() {
+            const content = document.getElementById('overlayContent');
+            const btn = document.getElementById('toggleBtn');
             if (content.classList.contains('collapsed')) {
                 content.classList.remove('collapsed');
-                toggleBtn.textContent = '−';
-                fetchLiveBusTimes();
+                btn.textContent = '−';
+                fetchAllData();
             } else {
                 content.classList.add('collapsed');
-                toggleBtn.textContent = '+';
+                btn.textContent = '+';
             }
         }
         
-        async function fetchLiveBusTimes() {
-            const busTimesDiv = document.getElementById('busTimes');
-            if (!busTimesDiv) return;
-            
-            busTimesDiv.innerHTML = '<div class="loading-bus">⏳ Loading bus times...</div>';
-            
+        async function fetchWeather() {
             try {
-                // Fetch Bus 21 schedule from hotel to city center
-                const bus21Response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userMessage: 'bus 21' })
-                });
-                const bus21Data = await bus21Response.json();
-                
-                // Fetch Bus 120 schedule from hotel to train station
-                const bus120Response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userMessage: 'bus 120' })
-                });
-                const bus120Data = await bus120Response.json();
-                
-                // Parse the responses to extract times
-                const bus21Times = extractTimesFromResponse(bus21Data.reply || '', '21');
-                const bus120Times = extractTimesFromResponse(bus120Data.reply || '', '120');
-                
-                let html = '';
-                
-                // Bus 21 Section
-                html += '<div class="bus-line">';
-                html += '<h4>🚌 Bus 21 → City Center</h4>';
-                if (bus21Times.length > 0) {
-                    for (const time of bus21Times.slice(0, 5)) {
-                        html += `<div class="bus-departure">
-                                    <span class="bus-time">${time}</span>
-                                    <span class="bus-direction"></span>
-                                 </div>`;
-                    }
-                } else {
-                    html += '<div class="bus-departure">No departures found</div>';
-                }
-                html += '</div>';
-                
-                // Bus 120 Section
-                html += '<div class="bus-line">';
-                html += '<h4>🚌 Bus 120 → Train Station</h4>';
-                if (bus120Times.length > 0) {
-                    for (const time of bus120Times.slice(0, 5)) {
-                        html += `<div class="bus-departure">
-                                    <span class="bus-time">${time}</span>
-                                    <span class="bus-direction"></span>
-                                 </div>`;
-                    }
-                } else {
-                    html += '<div class="bus-departure">No departures found</div>';
-                }
-                html += '</div>';
-                
-                busTimesDiv.innerHTML = html;
-                
-                // Update last updated time
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString();
-                const lastUpdatedElem = document.getElementById('lastUpdated');
-                if (lastUpdatedElem) {
-                    lastUpdatedElem.innerHTML = `🕐 Updated: ${timeStr}`;
-                }
-                
-            } catch (error) {
-                console.error('Error fetching bus times:', error);
-                busTimesDiv.innerHTML = '<div class="error-bus">⚠️ Error loading bus times</div>';
+                const res = await fetch('/api/weather');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                weatherData = data;
+                return data;
+            } catch (e) {
+                console.error('Weather error:', e);
+                return null;
             }
         }
         
-        function extractTimesFromResponse(text, busNumber) {
-            const times = [];
-            
-            // Look for time patterns like "20:34" or "  20:34"
-            const timeRegex = /(\d{2}:\d{2})/g;
-            let match;
-            
-            // For Bus 21, we only want times that appear after "Fürstenbrunn" or "City Center"
-            // For Bus 120, we only want times after "Hauptbahnhof" or "Train Station"
-            let relevantSection = false;
-            const lines = text.split('\n');
-            
-            for (const line of lines) {
-                // Check if this line indicates we're in the right section
-                if (busNumber === '21') {
-                    if (line.includes('Fürstenbrunn') || line.includes('City Center') || line.includes('Stadtzentrum')) {
-                        relevantSection = true;
-                    }
-                    if (line.includes('Other directions') || line.includes('Andere Richtungen')) {
-                        relevantSection = false;
-                    }
-                } else if (busNumber === '120') {
-                    if (line.includes('Hauptbahnhof') || line.includes('Train Station')) {
-                        relevantSection = true;
-                    }
-                }
-                
-                // Extract times if we're in the relevant section
-                if (relevantSection) {
-                    while ((match = timeRegex.exec(line)) !== null) {
-                        times.push(match[1]);
-                    }
-                }
+        async function fetchBusTimes() {
+            try {
+                const res = await fetch('/api/bus-times');
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                busData = data;
+                return data;
+            } catch (e) {
+                console.error('Bus error:', e);
+                return null;
             }
-            
-            // If no times found with section filtering, try to get any times from the response
-            if (times.length === 0) {
-                const allMatches = text.match(/\d{2}:\d{2}/g);
-                if (allMatches) {
-                    return allMatches.slice(0, 8);
-                }
-            }
-            
-            return times.slice(0, 8);
         }
         
-        function initBusOverlay() {
-            fetchLiveBusTimes();
-            if (busUpdateInterval) clearInterval(busUpdateInterval);
-            busUpdateInterval = setInterval(fetchLiveBusTimes, 60000);
+        function renderWeather(data) {
+            const div = document.getElementById('weatherDisplay');
+            if (!data || !data.current) {
+                div.innerHTML = '<div class="error-bus">Weather unavailable</div>';
+                return;
+            }
+            const c = data.current;
+            const f = data.forecast || [];
+            let html = `<div class="weather-section">
+                <span class="temp">${c.temp}°C</span>
+                <span class="condition">${c.condition}</span>
+                <div class="weather-forecast">`;
+            for (const day of f) {
+                html += `<div class="day">
+                    <div>${day.day}</div>
+                    <div><span class="high">${day.high}°</span> <span class="low">${day.low}°</span></div>
+                    <div style="font-size:8px;color:#999;">${day.condition}</div>
+                </div>`;
+            }
+            html += `</div></div>`;
+            div.innerHTML = html;
         }
         
-        // Initialize everything when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initBusOverlay();
-        });
+        function renderBus(data) {
+            const div = document.getElementById('busDisplay');
+            if (!data) {
+                div.innerHTML = '<div class="error-bus">Bus data unavailable</div>';
+                return;
+            }
+            let html = '';
+            
+            // Bus 21
+            html += `<div class="bus-line"><h4>🚌 Bus 21 → City Center</h4>`;
+            const b21 = data.bus21?.times || [];
+            if (b21.length > 0) {
+                for (const t of b21.slice(0, 5)) {
+                    html += `<div class="bus-departure">
+                        <span class="bus-time">${t.time}</span>
+                        ${t.delay ? `<span class="bus-delay">+${t.delay}m</span>` : ''}
+                    </div>`;
+                }
+            } else {
+                html += `<div class="bus-departure">No departures found</div>`;
+            }
+            html += '</div>';
+            
+            // Bus 120
+            html += `<div class="bus-line"><h4>🚌 Bus 120 → Train Station</h4>`;
+            const b120 = data.bus120?.times || [];
+            if (b120.length > 0) {
+                for (const t of b120.slice(0, 5)) {
+                    html += `<div class="bus-departure">
+                        <span class="bus-time">${t.time}</span>
+                        ${t.delay ? `<span class="bus-delay">+${t.delay}m</span>` : ''}
+                    </div>`;
+                }
+            } else {
+                html += `<div class="bus-departure">No departures found</div>`;
+            }
+            html += '</div>';
+            
+            div.innerHTML = html;
+        }
         
-        window.addEventListener('beforeunload', function() {
-            if (busUpdateInterval) clearInterval(busUpdateInterval);
-        });
+        async function fetchAllData() {
+            const weatherDiv = document.getElementById('weatherDisplay');
+            const busDiv = document.getElementById('busDisplay');
+            weatherDiv.innerHTML = '<div class="loading-bus">Loading weather...</div>';
+            busDiv.innerHTML = '<div class="loading-bus">Loading bus times...</div>';
+            
+            // Fetch both in parallel
+            const [w, b] = await Promise.all([fetchWeather(), fetchBusTimes()]);
+            
+            if (w) renderWeather(w);
+            else weatherDiv.innerHTML = '<div class="error-bus">Weather unavailable</div>';
+            
+            if (b) renderBus(b);
+            else busDiv.innerHTML = '<div class="error-bus">Bus data unavailable</div>';
+            
+            document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+        
+        function initOverlay() {
+            fetchAllData();
+            if (overlayInterval) clearInterval(overlayInterval);
+            // Refresh every 60 seconds for buses, weather refreshes on its own cache
+            overlayInterval = setInterval(() => {
+                fetchBusTimes().then(b => { if (b) renderBus(b); });
+                // Weather refreshes every 10 minutes via cache
+                if (!weatherData || Date.now() - weatherData._fetched > 600000) {
+                    fetchWeather().then(w => { if (w) renderWeather(w); });
+                }
+                document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            }, 60000);
+        }
+        
+        document.addEventListener('DOMContentLoaded', initOverlay);
+        window.addEventListener('beforeunload', () => { if (overlayInterval) clearInterval(overlayInterval); });
     </script>
 </body>
 </html>
