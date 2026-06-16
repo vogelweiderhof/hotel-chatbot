@@ -21,7 +21,34 @@ app.use((req, res, next) => {
     next();
 });
 
-// ========== HARDCODED RESPONSES (No AI, 100% token savings) ==========
+// ========== FILE PATHS ==========
+const ANALYTICS_FILE = path.join(__dirname, 'analytics.json');
+const ANALYTICS_BACKUP = path.join(__dirname, 'analytics.json.bak');
+
+// ========== HELPER FUNCTIONS ==========
+function isWeekendOrHoliday() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    return (dayOfWeek === 0 || dayOfWeek === 6);
+}
+
+function getTodayStr() {
+    return new Date().toISOString().split('T')[0];
+}
+
+function getMonthStr() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function isLastDayOfMonth() {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.getMonth() !== now.getMonth();
+}
+
+// ========== HARDCODED RESPONSES ==========
 const QUICK_RESPONSES = {
     'check-in': {
         en: "Check-in is from 15:00 to 20:00. Please notify us if arriving after 20:00.",
@@ -63,18 +90,10 @@ const QUICK_RESPONSES = {
 // ========== VAO/HAFAS API ==========
 const VAO_API_URL = "https://vao.demo.hafas.de/gate";
 
-// ========== BUS DATA CACHE ==========
 let busDataCache = {
     data: null,
     timestamp: null,
-    expiryMs: 60000 // 60 seconds
-};
-
-// ========== WEATHER CACHE ==========
-let weatherCache = {
-    data: null,
-    timestamp: null,
-    expiryMs: 600000 // 10 minutes
+    expiryMs: 60000
 };
 
 async function findStation(stationName) {
@@ -172,7 +191,6 @@ async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = 
         
         results = results.filter(r => r.busNumber && r.departureTime !== "--:--");
         
-        // Remove duplicates
         const uniqueResults = [];
         const seen = new Set();
         for (const r of results) {
@@ -195,38 +213,108 @@ async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = 
     }
 }
 
-// ========== DEDICATED BUS API ENDPOINT (No AI, cached) ==========
+// ========== DEDICATED BUS API ENDPOINT (WITH DETAILED LOGGING) ==========
 app.get('/api/bus-times', async (req, res) => {
     const now = Date.now();
     if (busDataCache.data && busDataCache.timestamp && (now - busDataCache.timestamp) < busDataCache.expiryMs) {
+        console.log('📦 Returning cached bus data');
         return res.json(busDataCache.data);
     }
     
+    console.log('🔄 Fetching fresh bus data...');
+    
     try {
         // Bus 21 to City Center
+        console.log('📊 Fetching Bus 21...');
         const hotelDepartures = await getRealTimeDepartures("Baron Schwarz Park", 30, "21");
-        const cityCenterBuses = hotelDepartures ? hotelDepartures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn')) : [];
+        console.log(`   Bus 21 found: ${hotelDepartures ? hotelDepartures.length : 0} departures`);
         
-        // Bus 120 to Train Station
-        const bus120Departures = await getRealTimeDepartures("Baron Schwarz Park", 20, "120");
-        const trainStationBuses = bus120Departures ? bus120Departures.filter(d => d.direction.toLowerCase().includes('hauptbahnhof')) : [];
+        const cityCenterBuses = hotelDepartures ? hotelDepartures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn')) : [];
+        console.log(`   Bus 21 to City Center: ${cityCenterBuses.length} departures`);
+        
+        // Bus 120
+        console.log('📊 Fetching Bus 120...');
+        const bus120Departures = await getRealTimeDepartures("Baron Schwarz Park", 30, "120");
+        console.log(`   Bus 120 found: ${bus120Departures ? bus120Departures.length : 0} departures`);
+        
+        if (bus120Departures && bus120Departures.length > 0) {
+            console.log('   Bus 120 directions:', bus120Departures.slice(0, 8).map(b => ({ dir: b.direction, time: b.departureTime })));
+        }
+        
+        const trainStationBuses120 = bus120Departures ? bus120Departures.filter(d => 
+            d.direction.toLowerCase().includes('hauptbahnhof') || 
+            d.direction.toLowerCase().includes('hbf') ||
+            d.direction.toLowerCase().includes('bahnhof')
+        ) : [];
+        console.log(`   Bus 120 to Train: ${trainStationBuses120.length} departures`);
+        
+        // Bus 121
+        console.log('📊 Fetching Bus 121...');
+        const bus121Departures = await getRealTimeDepartures("Baron Schwarz Park", 30, "121");
+        console.log(`   Bus 121 found: ${bus121Departures ? bus121Departures.length : 0} departures`);
+        
+        if (bus121Departures && bus121Departures.length > 0) {
+            console.log('   Bus 121 directions:', bus121Departures.slice(0, 8).map(b => ({ dir: b.direction, time: b.departureTime })));
+        }
+        
+        const trainStationBuses121 = bus121Departures ? bus121Departures.filter(d => 
+            d.direction.toLowerCase().includes('hauptbahnhof') || 
+            d.direction.toLowerCase().includes('hbf') ||
+            d.direction.toLowerCase().includes('bahnhof')
+        ) : [];
+        console.log(`   Bus 121 to Train: ${trainStationBuses121.length} departures`);
+        
+        // Combine and sort
+        const combinedTrainBuses = [...trainStationBuses120, ...trainStationBuses121];
+        console.log(`   Combined train buses: ${combinedTrainBuses.length} departures`);
+        combinedTrainBuses.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
+        
+        // Remove duplicates
+        const uniqueTrainBuses = [];
+        const seenTimes = new Set();
+        for (const bus of combinedTrainBuses) {
+            if (!seenTimes.has(bus.departureTime)) {
+                seenTimes.add(bus.departureTime);
+                uniqueTrainBuses.push(bus);
+            }
+        }
+        console.log(`   Unique train buses: ${uniqueTrainBuses.length} departures`);
+        
+        if (uniqueTrainBuses.length > 0) {
+            console.log('   Final train bus times:', uniqueTrainBuses.slice(0, 6).map(b => ({ time: b.departureTime, bus: b.busNumber })));
+        }
         
         const busData = {
             timestamp: new Date().toISOString(),
-            bus21: { times: cityCenterBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) },
-            bus120: { times: trainStationBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) }
+            bus21: { 
+                times: cityCenterBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) 
+            },
+            bus120: { 
+                times: uniqueTrainBuses.slice(0, 6).map(b => ({ 
+                    time: b.departureTime, 
+                    delay: b.delay,
+                    busNumber: b.busNumber 
+                }))
+            }
         };
         
         busDataCache = { data: busData, timestamp: now, expiryMs: 60000 };
+        console.log('✅ Bus data cached');
         res.json(busData);
         
     } catch (error) {
-        console.error('Bus API error:', error.message);
+        console.error('❌ Bus API error:', error.message);
         res.status(500).json({ error: 'Failed to fetch bus times' });
     }
 });
 
-// ========== WEATHER API ENDPOINT (No AI, cached) ==========
+// ========== WEATHER API ==========
+let weatherCache = {
+    data: null,
+    timestamp: null,
+    expiryMs: 600000
+};
+
 app.get('/api/weather', async (req, res) => {
     const now = Date.now();
     if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
@@ -280,7 +368,7 @@ app.get('/api/weather', async (req, res) => {
     }
 });
 
-// ========== STATIC KNOWLEDGE BASE (Compressed) ==========
+// ========== STATIC KNOWLEDGE BASE ==========
 function getKnowledgeBase() {
     return {
         stops: {
@@ -328,32 +416,234 @@ function loadFAQs() {
     }
 }
 
-// ========== ANALYTICS ==========
+// ========== ANALYTICS - INITIALIZATION ==========
+const COST_PER_MILLION = 0.20;
+
+// ========== ANALYTICS LOAD/SAVE FUNCTIONS ==========
+function loadAnalytics() {
+    try {
+        if (fs.existsSync(ANALYTICS_FILE)) {
+            const data = fs.readFileSync(ANALYTICS_FILE, 'utf8');
+            const parsed = JSON.parse(data);
+            console.log(`✅ Analytics loaded from file`);
+            return parsed;
+        }
+    } catch (error) {
+        console.log('⚠️ Analytics file read error:', error.message);
+        if (fs.existsSync(ANALYTICS_BACKUP)) {
+            try {
+                const backupData = fs.readFileSync(ANALYTICS_BACKUP, 'utf8');
+                const parsed = JSON.parse(backupData);
+                console.log(`✅ Analytics loaded from backup file`);
+                return parsed;
+            } catch (e) {
+                console.log('⚠️ Backup file also corrupted, starting fresh');
+            }
+        }
+    }
+    return null;
+}
+
+function saveAnalytics() {
+    try {
+        const dataToSave = {
+            q: analytics.q,
+            tk: analytics.tk,
+            pt: analytics.pt,
+            ct: analytics.ct,
+            cost: analytics.cost,
+            topQ: Object.fromEntries(analytics.topQ),
+            sessions: Array.from(analytics.sessions),
+            byCat: analytics.byCat,
+            recent: analytics.recent.slice(0, 30),
+            startTime: analytics.startTime,
+            savedAt: Date.now()
+        };
+        
+        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(dataToSave, null, 2));
+        fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(dataToSave, null, 2));
+        
+        console.log(`💾 Analytics saved (${analytics.q} questions, $${analytics.cost.toFixed(4)})`);
+    } catch (error) {
+        console.error('❌ Failed to save analytics:', error.message);
+    }
+}
+
+function restoreAnalytics(savedData) {
+    if (!savedData) return;
+    
+    analytics.q = savedData.q || 0;
+    analytics.tk = savedData.tk || 0;
+    analytics.pt = savedData.pt || 0;
+    analytics.ct = savedData.ct || 0;
+    analytics.cost = savedData.cost || 0;
+    analytics.topQ = new Map(Object.entries(savedData.topQ || {}));
+    analytics.sessions = new Set(savedData.sessions || []);
+    analytics.byCat = savedData.byCat || {};
+    analytics.recent = savedData.recent || [];
+    analytics.startTime = savedData.startTime || Date.now();
+    
+    console.log(`📊 Analytics restored: ${analytics.q} questions, ${analytics.sessions.size} unique sessions`);
+}
+
+// ========== ANALYTICS OBJECT ==========
 const analytics = {
-    q: 0, // questions
-    tk: 0, // total tokens
-    pt: 0, // prompt tokens
-    ct: 0, // completion tokens
+    q: 0,
+    tk: 0,
+    pt: 0,
+    ct: 0,
     cost: 0,
     topQ: new Map(),
     sessions: new Set(),
     byCat: {},
-    recent: []
+    recent: [],
+    startTime: Date.now()
 };
 
-const COST_PER_MILLION = 0.20;
+// Load saved analytics on startup
+const savedAnalytics = loadAnalytics();
+if (savedAnalytics) {
+    restoreAnalytics(savedAnalytics);
+}
 
-function updateAnalytics(usage, cat = 'gen') {
+// ========== ANALYTICS SAVE INTERVAL ==========
+let questionsSinceLastSave = 0;
+const SAVE_AFTER_QUESTIONS = 10;
+
+function checkAndSaveAnalytics() {
+    questionsSinceLastSave++;
+    if (questionsSinceLastSave >= SAVE_AFTER_QUESTIONS) {
+        saveAnalytics();
+        questionsSinceLastSave = 0;
+    }
+}
+
+// Auto-save every 5 minutes
+setInterval(() => {
+    saveAnalytics();
+}, 5 * 60 * 1000);
+
+// Save on process exit
+process.on('SIGINT', () => {
+    console.log('\n🔄 Saving analytics before shutdown...');
+    saveAnalytics();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.log('\n🔄 Saving analytics before shutdown...');
+    saveAnalytics();
+    process.exit(0);
+});
+
+// ========== DAILY AND MONTHLY BACKUPS ==========
+function createDailyBackup() {
+    try {
+        const today = getTodayStr();
+        const archiveFile = path.join(__dirname, `analytics-${today}.json`);
+        
+        if (fs.existsSync(archiveFile)) return;
+        
+        const dataToSave = {
+            q: analytics.q,
+            tk: analytics.tk,
+            pt: analytics.pt,
+            ct: analytics.ct,
+            cost: analytics.cost,
+            topQ: Object.fromEntries(analytics.topQ),
+            sessions: Array.from(analytics.sessions),
+            byCat: analytics.byCat,
+            recent: analytics.recent.slice(0, 20),
+            startTime: analytics.startTime,
+            savedAt: Date.now()
+        };
+        
+        fs.writeFileSync(archiveFile, JSON.stringify(dataToSave, null, 2));
+        console.log(`📁 Daily archive created: analytics-${today}.json`);
+        
+        const files = fs.readdirSync(__dirname);
+        const archiveFiles = files.filter(f => 
+            f.startsWith('analytics-') && 
+            f.endsWith('.json') && 
+            f !== 'analytics.json' && 
+            f !== 'analytics.json.bak'
+        );
+        archiveFiles.sort().reverse();
+        const toDelete = archiveFiles.slice(3);
+        for (const file of toDelete) {
+            fs.unlinkSync(path.join(__dirname, file));
+            console.log(`🗑️ Deleted old archive: ${file}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to create daily backup:', error.message);
+    }
+}
+
+function createMonthlyBackup() {
+    try {
+        const monthStr = getMonthStr();
+        const archiveFile = path.join(__dirname, `analytics-${monthStr}.json`);
+        
+        if (fs.existsSync(archiveFile)) return;
+        
+        const dataToSave = {
+            q: analytics.q,
+            tk: analytics.tk,
+            pt: analytics.pt,
+            ct: analytics.ct,
+            cost: analytics.cost,
+            topQ: Object.fromEntries(analytics.topQ),
+            sessions: Array.from(analytics.sessions),
+            byCat: analytics.byCat,
+            recent: analytics.recent.slice(0, 20),
+            startTime: analytics.startTime,
+            savedAt: Date.now()
+        };
+        
+        fs.writeFileSync(archiveFile, JSON.stringify(dataToSave, null, 2));
+        console.log(`📁 Monthly archive created: analytics-${monthStr}.json`);
+        
+    } catch (error) {
+        console.error('❌ Failed to create monthly backup:', error.message);
+    }
+}
+
+setInterval(() => {
+    createDailyBackup();
+    if (isLastDayOfMonth()) {
+        createMonthlyBackup();
+    }
+}, 60 * 60 * 1000);
+
+setTimeout(() => {
+    createDailyBackup();
+    if (isLastDayOfMonth()) {
+        createMonthlyBackup();
+    }
+}, 5000);
+
+// ========== UPDATE ANALYTICS FUNCTION ==========
+function updateAnalytics(usage, cat = 'gen', questionText = '') {
     if (!usage) return;
+    
     const p = usage.prompt_tokens || 0;
     const c = usage.completion_tokens || 0;
     const t = usage.total_tokens || 0;
+    
     analytics.tk += t;
     analytics.pt += p;
     analytics.ct += c;
     analytics.cost += (t / 1000000) * COST_PER_MILLION;
+    
     if (!analytics.byCat[cat]) analytics.byCat[cat] = 0;
     analytics.byCat[cat] += t;
+    
+    if (questionText) {
+        const norm = questionText.toLowerCase().substring(0, 100);
+        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
+    }
+    
     analytics.recent.unshift({
         ts: new Date().toISOString(),
         pt: p,
@@ -362,20 +652,11 @@ function updateAnalytics(usage, cat = 'gen') {
         cost: (t / 1000000 * COST_PER_MILLION).toFixed(6),
         cat: cat
     });
-    if (analytics.recent.length > 20) analytics.recent.pop();
+    if (analytics.recent.length > 50) analytics.recent.pop();
+    
+    analytics.q++;
+    checkAndSaveAnalytics();
 }
-
-setInterval(() => {
-    const topQ = Array.from(analytics.topQ.entries())
-        .sort((a, b) => b[1] - a[1]).slice(0, 10)
-        .map(([q, c]) => ({ q: q.substring(0, 100), c }));
-    fs.writeFileSync(path.join(__dirname, 'analytics.json'), JSON.stringify({
-        q: analytics.q,
-        topQ: topQ,
-        tk: analytics.tk,
-        cost: analytics.cost.toFixed(4)
-    }));
-}, 3600000);
 
 // ========== BOT CONFIG ==========
 let botConfig = {
@@ -424,15 +705,19 @@ setInterval(() => {
 }, 3600000);
 
 // ========== API ENDPOINTS ==========
+
+// Analytics
 app.get('/api/analytics', (req, res) => {
     const topQ = Array.from(analytics.topQ.entries())
         .sort((a, b) => b[1] - a[1]).slice(0, 15)
         .map(([q, c]) => ({ q, c }));
     const avg = analytics.q > 0 ? Math.round(analytics.tk / analytics.q) : 0;
+    
     res.json({
         q: analytics.q,
         topQ: topQ,
         sessions: analytics.sessions.size,
+        startTime: analytics.startTime,
         token: {
             cost: analytics.cost.toFixed(4),
             tk: analytics.tk,
@@ -445,6 +730,7 @@ app.get('/api/analytics', (req, res) => {
     });
 });
 
+// Limits
 app.get('/api/limits', (req, res) => { res.json(limitsConfig); });
 
 app.post('/api/limits', (req, res) => {
@@ -465,6 +751,7 @@ app.post('/api/reset-session', (req, res) => {
     res.json({ success: true });
 });
 
+// Setup and Rules
 app.post('/api/setup', (req, res) => {
     const { personality, safetyRules, styleRules } = req.body;
     if (personality) botConfig.personality = personality;
@@ -490,6 +777,117 @@ app.get('/api/get-rules', (req, res) => {
     });
 });
 
+// ========== BACKUP BROWSER API ENDPOINTS ==========
+
+// List all available backups
+app.get('/api/backups', (req, res) => {
+    try {
+        const files = fs.readdirSync(__dirname);
+        const backupFiles = files.filter(f => 
+            (f.startsWith('analytics-') && f.endsWith('.json')) || 
+            f === 'analytics.json' || 
+            f === 'analytics.json.bak'
+        );
+        
+        backupFiles.sort((a, b) => {
+            if (a === 'analytics.json') return -1;
+            if (b === 'analytics.json') return 1;
+            if (a === 'analytics.json.bak') return -1;
+            if (b === 'analytics.json.bak') return 1;
+            return b.localeCompare(a);
+        });
+        
+        res.json({ backups: backupFiles });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get a specific backup file
+app.get('/api/backup/:filename', (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(__dirname, filename);
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Backup file not found' });
+        }
+        
+        const data = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(data);
+        
+        const response = {
+            label: filename.replace('analytics-', '').replace('.json', ''),
+            q: parsed.q || 0,
+            cost: parsed.cost || '0.0000',
+            sessions: parsed.sessions ? parsed.sessions.length : 0,
+            timestamp: parsed.savedAt || parsed.lastSaved || parsed.startTime,
+            token: {
+                cost: parsed.cost || '0.0000',
+                tk: parsed.tk || 0,
+                pt: parsed.pt || 0,
+                ct: parsed.ct || 0,
+                avg: parsed.q > 0 ? Math.round((parsed.tk || 0) / parsed.q) : 0,
+                byCat: parsed.byCat || {},
+                recent: parsed.recent || []
+            },
+            topQ: Array.from(Object.entries(parsed.topQ || {}))
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15)
+                .map(([q, c]) => ({ q, c }))
+        };
+        
+        res.json(response);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete a backup file
+app.delete('/api/backup/:filename', (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(__dirname, filename);
+        
+        if (filename === 'analytics.json' || filename === 'analytics.json.bak') {
+            return res.status(400).json({ error: 'Cannot delete current analytics file' });
+        }
+        
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Backup file not found' });
+        }
+        
+        fs.unlinkSync(filePath);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Restore a backup as current analytics
+app.post('/api/restore-backup', (req, res) => {
+    try {
+        const { filename } = req.body;
+        const backupPath = path.join(__dirname, filename);
+        
+        if (!fs.existsSync(backupPath)) {
+            return res.status(404).json({ error: 'Backup file not found' });
+        }
+        
+        const backupData = fs.readFileSync(backupPath, 'utf8');
+        const parsed = JSON.parse(backupData);
+        
+        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(parsed, null, 2));
+        fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(parsed, null, 2));
+        
+        restoreAnalytics(parsed);
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ========== MAIN CHAT ENDPOINT ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -503,7 +901,7 @@ app.post('/api/chat', async (req, res) => {
     
     const lower = question.toLowerCase();
     
-    // ========== HARDCODED RESPONSES (No AI) ==========
+    // ========== HARDCODED RESPONSES ==========
     for (const [key, responses] of Object.entries(QUICK_RESPONSES)) {
         if (lower.includes(key)) {
             let lang = 'en';
@@ -513,18 +911,18 @@ app.post('/api/chat', async (req, res) => {
             analytics.q++;
             const norm = question.toLowerCase().substring(0, 100);
             analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
+            checkAndSaveAnalytics();
             return res.json({ reply });
         }
     }
     
-    // ========== AI RESPONSE FOR COMPLEX QUESTIONS ==========
+    // ========== AI RESPONSE ==========
     const faqContent = loadFAQs();
     let history = conversationMemory.get(ip) || [];
     const historyText = history.slice(-4).map(m => `${m.role}: ${m.content}`).join('\n');
     const kb = getKnowledgeBase();
     const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
     
-    // Detect language
     let lang = 'en';
     if (/[äöüß]/.test(question)) lang = 'de';
     else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
@@ -535,7 +933,6 @@ app.post('/api/chat', async (req, res) => {
         zh: "用中文回复。"
     };
     
-    // Compressed system prompt
     const sysPrompt = `Hotel Vogelweiderhof assistant. ${langInst[lang]} Never end with questions.
 
 FACTS:
@@ -577,7 +974,6 @@ GUEST: ${question}`;
         
         let reply = response.data.choices[0].message.content;
         
-        // Remove any follow-up questions
         reply = reply.replace(/\?$/, '.');
         reply = reply.replace(/ Would you like.*$/s, '');
         reply = reply.replace(/ Can I help.*$/s, '');
@@ -585,19 +981,14 @@ GUEST: ${question}`;
         reply = reply.replace(/ Let me know if.*$/s, '');
         reply = reply.replace(/ Feel free to.*$/s, '');
         
-        // Track analytics
         if (response.data.usage) {
             let cat = 'gen';
-            if (lower.includes('bus')) cat = 'bus';
-            else if (lower.includes('wetter') || lower.includes('weather')) cat = 'wthr';
-            else if (lower.includes('restaurant') || lower.includes('essen')) cat = 'food';
-            else if (lower.includes('sehenswürdigkeiten') || lower.includes('sightseeing')) cat = 'sght';
-            updateAnalytics(response.data.usage, cat);
+            if (lower.includes('bus') || lower.includes('fahrplan') || lower.includes('abfahrt')) cat = 'bus';
+            else if (lower.includes('wetter') || lower.includes('weather') || lower.includes('temp')) cat = 'wthr';
+            else if (lower.includes('restaurant') || lower.includes('essen') || lower.includes('food')) cat = 'food';
+            else if (lower.includes('sehenswürdigkeiten') || lower.includes('sightseeing') || lower.includes('attraction')) cat = 'sght';
+            updateAnalytics(response.data.usage, cat, question);
         }
-        
-        analytics.q++;
-        const norm = question.toLowerCase().substring(0, 100);
-        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
         
         history.push({ role: "user", content: question.substring(0, 300) });
         history.push({ role: "assistant", content: reply.substring(0, 500) });
@@ -612,6 +1003,7 @@ GUEST: ${question}`;
     }
 });
 
+// ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
@@ -620,11 +1012,20 @@ app.listen(PORT, () => {
     console.log(`🌤️ Weather API: ENABLED (cached 10min)`);
     console.log(`📊 Hardcoded responses: ENABLED (check-in, wifi, breakfast, etc.)`);
     console.log(`💾 Conversation: last 4 messages only (reduced tokens)`);
+    console.log(`📁 Analytics: Auto-save every 5 min / 10 questions`);
+    console.log(`📁 Daily backups: Keeps last 3 days`);
+    console.log(`📁 Monthly backups: End of each month`);
     console.log(`📋 FAQ loaded: ${loadFAQs() !== "No FAQ" ? "YES" : "NO"}`);
     console.log(`\n✅ Token savings implemented:`);
     console.log(`   • Hardcoded common questions (100% savings)`);
     console.log(`   • Dedicated bus/weather endpoints (no AI)`);
     console.log(`   • Compressed system prompt (50% savings)`);
     console.log(`   • Reduced history to 4 messages (20% savings)`);
-    console.log(`   • Minified JSON data (10% savings)\n`);
+    console.log(`   • Minified JSON data (10% savings)`);
+    console.log(`\n✅ Analytics:`);
+    console.log(`   • ${analytics.q} questions tracked so far`);
+    console.log(`   • $${analytics.cost.toFixed(4)} total cost`);
+    console.log(`   • ${analytics.sessions.size} unique sessions`);
+    console.log(`\n📊 Bus 120/121 debug logging ENABLED`);
+    console.log(`   • Check console when /api/bus-times is called\n`);
 });

@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hotel Vogelweiderhof - AI Admin Panel</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -73,7 +74,7 @@
             font-size: 12px;
         }
         
-        input, textarea {
+        input, textarea, select {
             width: 100%;
             padding: 8px 10px;
             margin-bottom: 8px;
@@ -99,6 +100,8 @@
         button:hover { background: #3A5E3C; }
         button.success { background: #D4A373; }
         button.success:hover { background: #c49162; }
+        button.secondary { background: #6c757d; }
+        button.secondary:hover { background: #5a6268; }
         
         .status {
             margin-top: 12px;
@@ -109,6 +112,7 @@
         .success-bg { background: #d4edda; color: #155724; }
         .error-bg { background: #f8d7da; color: #721c24; }
         .info-bg { background: #d1ecf1; color: #0c5460; }
+        .warning-bg { background: #fff3cd; color: #856404; }
         
         .limit-row {
             display: flex;
@@ -234,6 +238,34 @@
         
         .full-width { grid-column: span 3; }
         
+        /* Backup Browser Styles */
+        .backup-browser {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .backup-browser select {
+            flex: 2;
+            min-width: 150px;
+            margin-bottom: 0;
+        }
+        .backup-browser button {
+            flex: 0 0 auto;
+            width: auto;
+            padding: 8px 16px;
+            margin-top: 0;
+        }
+        .backup-info {
+            font-size: 11px;
+            color: #666;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+        .backup-info .label { font-weight: bold; color: #3A5E3C; }
+        
         @media (max-width: 1400px) {
             .container { grid-template-columns: repeat(2, 1fr); }
             .full-width { grid-column: span 2; }
@@ -255,9 +287,9 @@
     </div>
     
     <div class="container">
-        <!-- PANEL 1: SETUP -->
+        <!-- PANEL 1: INITIAL SETUP -->
         <div class="panel">
-            <h2>📥 1. Setup</h2>
+            <h2>📥 1. Initial Setup</h2>
             <label>Bot Personality:</label>
             <textarea id="personality" rows="3">Helpful hotel front desk agent at Hotel Vogelweiderhof.</textarea>
             
@@ -271,9 +303,29 @@
             <div id="status" class="status"></div>
         </div>
         
-        <!-- PANEL 2: LIMITS -->
+        <!-- PANEL 2: LIVE RULES EDITOR -->
         <div class="panel">
-            <h2>🛡️ 2. Limits</h2>
+            <h2>⚙️ 2. Edit Rules</h2>
+            <label>Personality:</label>
+            <textarea id="livePersonality" rows="2"></textarea>
+            
+            <label>Safety Rules:</label>
+            <textarea id="liveSafety" rows="2"></textarea>
+            
+            <label>Style Rules:</label>
+            <textarea id="liveStyle" rows="2"></textarea>
+            
+            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
+            
+            <div class="link-hint">
+                💡 <strong>Guest Chat Link:</strong><br>
+                <span id="inlineChatLink">Loading...</span>
+            </div>
+        </div>
+        
+        <!-- PANEL 3: LIMITS CONTROL -->
+        <div class="panel">
+            <h2>🛡️ 3. Limits Control</h2>
             
             <div class="limit-row">
                 <label>Max tokens/response:</label>
@@ -300,14 +352,14 @@
             </div>
             
             <button onclick="saveLimits()" class="success">💾 Save Limits</button>
-            <button onclick="loadLimits()">🔄 Refresh</button>
+            <button onclick="loadLimits()" class="secondary">🔄 Refresh</button>
             
             <div class="current-values" id="limitsDisplay">Loading...</div>
         </div>
         
-        <!-- PANEL 3: TEST CHAT -->
+        <!-- PANEL 4: TEST CHAT -->
         <div class="panel">
-            <h2>💬 3. Test Chat</h2>
+            <h2>💬 4. Test Chat</h2>
             <div class="messages" id="messages">
                 <div class="bot-msg">👋 Test your bot here.</div>
             </div>
@@ -315,25 +367,52 @@
             <button onclick="sendTestMessage()">Send</button>
         </div>
         
-        <!-- PANEL 4: ANALYTICS -->
+        <!-- PANEL 5: ANALYTICS -->
         <div class="panel">
-            <h2>📊 4. Analytics</h2>
+            <h2>📊 5. Analytics</h2>
             <div id="analyticsDisplay">
                 <div class="info-bg" style="padding: 10px; text-align: center;">Loading analytics...</div>
             </div>
-            <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh</button>
+            <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh Analytics</button>
         </div>
         
-        <!-- PANEL 5: TOKEN ANALYTICS -->
+        <!-- PANEL 6: TOKEN ANALYTICS & COSTS -->
         <div class="panel">
-            <h2>💰 5. Token Analytics</h2>
+            <h2>💰 6. Token Analytics & Costs</h2>
             <div id="tokenAnalyticsDisplay">
                 <div class="info-bg" style="padding: 10px; text-align: center;">Loading token analytics...</div>
             </div>
-            <button onclick="refreshTokenAnalytics()" style="background: #D4A373;">🔄 Refresh</button>
+            <button onclick="refreshTokenAnalytics()" style="background: #D4A373;">🔄 Refresh Token Stats</button>
             <div class="current-values" style="margin-top: 10px;">
                 <small>💡 DeepSeek cost: ~$0.20 per 1M tokens</small>
             </div>
+        </div>
+        
+        <!-- PANEL 7: BACKUP BROWSER -->
+        <div class="panel full-width">
+            <h2>📁 7. Backup Browser</h2>
+            <div class="backup-browser">
+                <select id="backupSelect">
+                    <option value="current">📊 Current Live Data</option>
+                    <option value="---" disabled>──────────</option>
+                </select>
+                <button onclick="loadBackup()" style="background: #D4A373;">📂 Load Backup</button>
+                <button onclick="refreshBackupList()" class="secondary" style="width: auto;">🔄 Refresh List</button>
+            </div>
+            <div id="backupInfo" class="backup-info">
+                <span class="label">📅 Showing:</span> <span id="backupDateLabel">Current Live Data</span>
+                <span style="margin-left: 20px;"><span class="label">📊 Questions:</span> <span id="backupQuestions">-</span></span>
+                <span style="margin-left: 20px;"><span class="label">💰 Cost:</span> <span id="backupCost">-</span></span>
+                <span style="margin-left: 20px;"><span class="label">📅 Date:</span> <span id="backupTimestamp">-</span></span>
+            </div>
+            <div id="backupAnalyticsDisplay" style="max-height: 300px; overflow-y: auto;">
+                <div class="info-bg" style="padding: 10px; text-align: center;">Select a backup to view</div>
+            </div>
+            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="deleteSelectedBackup()" style="background: #dc3545; width: auto; padding: 8px 16px;">🗑️ Delete Selected</button>
+                <button onclick="restoreSelectedBackup()" style="background: #28a745; width: auto; padding: 8px 16px;">↩️ Restore as Current</button>
+            </div>
+            <div id="backupStatus" class="status"></div>
         </div>
     </div>
     
@@ -348,6 +427,7 @@
             const link = getChatLink();
             document.getElementById('chatLink').href = link;
             document.getElementById('chatLink').textContent = link;
+            document.getElementById('inlineChatLink').innerHTML = `<a href="${link}" target="_blank">${link}</a>`;
         }
         
         function copyChatLink() {
@@ -378,12 +458,44 @@
                 const result = await res.json();
                 if (result.success) {
                     status.innerHTML = '<div class="success-bg">✅ Setup complete!</div>';
+                    loadCurrentRules();
                 } else {
                     status.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
                 }
             } catch(e) {
                 status.innerHTML = '<div class="error-bg">❌ Connection error</div>';
             }
+        }
+        
+        // ========== RULES EDITOR ==========
+        async function loadCurrentRules() {
+            try {
+                const res = await fetch('/api/get-rules');
+                const rules = await res.json();
+                document.getElementById('livePersonality').value = rules.personality || '';
+                document.getElementById('liveSafety').value = rules.safetyRules || '';
+                document.getElementById('liveStyle').value = rules.styleRules || '';
+            } catch(e) { console.error('Failed to load rules', e); }
+        }
+        
+        async function updateRulesOnly() {
+            const data = {
+                personality: document.getElementById('livePersonality').value,
+                safetyRules: document.getElementById('liveSafety').value,
+                styleRules: document.getElementById('liveStyle').value
+            };
+            
+            try {
+                const res = await fetch('/api/update-rules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    addTestMessage('bot', '✨ Rules updated!');
+                }
+            } catch(e) { addTestMessage('bot', '❌ Error updating rules'); }
         }
         
         // ========== LIMITS ==========
@@ -515,14 +627,180 @@
             }
         }
         
+        // ========== BACKUP BROWSER ==========
+        async function refreshBackupList() {
+            try {
+                const res = await fetch('/api/backups');
+                const data = await res.json();
+                const select = document.getElementById('backupSelect');
+                
+                // Clear existing options (keep first two)
+                while (select.options.length > 2) {
+                    select.remove(2);
+                }
+                
+                // Add backup files
+                if (data.backups && data.backups.length > 0) {
+                    // Add separator if not already there
+                    if (select.options.length === 1) {
+                        const sep = document.createElement('option');
+                        sep.disabled = true;
+                        sep.textContent = '──────────';
+                        sep.value = '---';
+                        select.add(sep);
+                    }
+                    
+                    for (const backup of data.backups) {
+                        const opt = document.createElement('option');
+                        opt.value = backup;
+                        const label = backup.replace('analytics-', '').replace('.json', '');
+                        opt.textContent = label === 'current' ? '📊 Current Live Data' : `📁 ${label}`;
+                        select.add(opt);
+                    }
+                }
+                
+                document.getElementById('backupStatus').innerHTML = '<div class="success-bg">✅ Backup list refreshed</div>';
+                setTimeout(() => {
+                    document.getElementById('backupStatus').innerHTML = '';
+                }, 3000);
+                
+            } catch(e) {
+                document.getElementById('backupStatus').innerHTML = `<div class="error-bg">❌ Error loading backups: ${e.message}</div>`;
+            }
+        }
+        
+        async function loadBackup() {
+            const select = document.getElementById('backupSelect');
+            const filename = select.value;
+            
+            if (!filename) return;
+            
+            const status = document.getElementById('backupStatus');
+            status.innerHTML = '<div class="info-bg">⏳ Loading backup...</div>';
+            
+            try {
+                const res = await fetch(`/api/backup/${filename}`);
+                const data = await res.json();
+                
+                if (data.error) {
+                    status.innerHTML = `<div class="error-bg">❌ ${data.error}</div>`;
+                    return;
+                }
+                
+                // Update info
+                document.getElementById('backupDateLabel').textContent = data.label || filename;
+                document.getElementById('backupQuestions').textContent = data.q || 0;
+                document.getElementById('backupCost').textContent = data.cost ? `$${data.cost}` : '-';
+                document.getElementById('backupTimestamp').textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : '-';
+                
+                // Display analytics
+                const token = data.token || {};
+                const topQ = data.topQ || [];
+                
+                let html = `
+                    <div class="analytics-row"><strong>📊 Total Questions</strong> <span class="analytics-number">${data.q || 0}</span></div>
+                    <div class="analytics-row"><strong>👥 Unique Sessions</strong> <span>${data.sessions || 0}</span></div>
+                    <hr>
+                    <div class="analytics-row"><strong>💰 Estimated Cost</strong> <span class="analytics-number">$${token.cost || '0.0000'}</span></div>
+                    <div class="analytics-row"><strong>🎯 Total Tokens</strong> <span>${(token.tk || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📥 Prompt Tokens</strong> <span>${(token.pt || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📤 Completion Tokens</strong> <span>${(token.ct || 0).toLocaleString()}</span></div>
+                    <div class="analytics-row"><strong>📊 Avg Tokens/Question</strong> <span>${token.avg || 0}</span></div>
+                    <hr>
+                    <strong>📂 Tokens by Category</strong>
+                    ${Object.entries(token.byCat || {}).filter(([k,v]) => v > 0).map(([cat, count]) => `<div class="analytics-row">• ${cat} <span>${(count || 0).toLocaleString()}</span></div>`).join('') || '<div>No data yet</div>'}
+                    <hr>
+                    <strong>🔥 Top Questions</strong>
+                    ${(topQ || []).slice(0, 10).map(q => `<div class="analytics-row">• "${q.q?.substring(0, 40) || q}" <span>${q.c || 1}×</span></div>`).join('') || '<div>No questions yet</div>'}
+                `;
+                
+                document.getElementById('backupAnalyticsDisplay').innerHTML = html;
+                status.innerHTML = '<div class="success-bg">✅ Backup loaded successfully</div>';
+                setTimeout(() => {
+                    status.innerHTML = '';
+                }, 3000);
+                
+            } catch(e) {
+                status.innerHTML = `<div class="error-bg">❌ Error loading backup: ${e.message}</div>`;
+            }
+        }
+        
+        async function deleteSelectedBackup() {
+            const select = document.getElementById('backupSelect');
+            const filename = select.value;
+            
+            if (!filename || filename === 'current') {
+                document.getElementById('backupStatus').innerHTML = '<div class="warning-bg">⚠️ Cannot delete current live data</div>';
+                return;
+            }
+            
+            if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+            
+            try {
+                const res = await fetch(`/api/backup/${filename}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('backupStatus').innerHTML = '<div class="success-bg">✅ Backup deleted</div>';
+                    refreshBackupList();
+                    // Reset display
+                    document.getElementById('backupAnalyticsDisplay').innerHTML = '<div class="info-bg" style="padding: 10px; text-align: center;">Select a backup to view</div>';
+                } else {
+                    document.getElementById('backupStatus').innerHTML = `<div class="error-bg">❌ ${data.error || 'Failed to delete'}</div>`;
+                }
+            } catch(e) {
+                document.getElementById('backupStatus').innerHTML = `<div class="error-bg">❌ Error: ${e.message}</div>`;
+            }
+        }
+        
+        async function restoreSelectedBackup() {
+            const select = document.getElementById('backupSelect');
+            const filename = select.value;
+            
+            if (!filename || filename === 'current') {
+                document.getElementById('backupStatus').innerHTML = '<div class="warning-bg">⚠️ Already on current live data</div>';
+                return;
+            }
+            
+            if (!confirm(`Restore ${filename} as current analytics? This will overwrite current data.`)) return;
+            
+            try {
+                const res = await fetch('/api/restore-backup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('backupStatus').innerHTML = '<div class="success-bg">✅ Backup restored as current data</div>';
+                    refreshAnalytics();
+                    refreshTokenAnalytics();
+                    setTimeout(() => {
+                        document.getElementById('backupStatus').innerHTML = '';
+                    }, 5000);
+                } else {
+                    document.getElementById('backupStatus').innerHTML = `<div class="error-bg">❌ ${data.error || 'Failed to restore'}</div>`;
+                }
+            } catch(e) {
+                document.getElementById('backupStatus').innerHTML = `<div class="error-bg">❌ Error: ${e.message}</div>`;
+            }
+        }
+        
         // ========== INIT ==========
         updateChatLink();
         loadLimits();
+        loadCurrentRules();
         refreshAnalytics();
         refreshTokenAnalytics();
+        refreshBackupList();
+        
         setInterval(updateChatLink, 5000);
         setInterval(refreshAnalytics, 30000);
         setInterval(refreshTokenAnalytics, 60000);
+        setInterval(refreshBackupList, 120000); // Refresh backup list every 2 minutes
     </script>
 </body>
 </html>

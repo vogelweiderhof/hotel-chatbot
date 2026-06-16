@@ -7,6 +7,8 @@ CHECK-OUT TIME | 11:00 AM
 WIFI PASSWORD | wifi password is small cases just: internet
 WIFI NETWORK | Vogelweiderhof
 
+LATE ARRIVAL | Keybox with keysafes for late Arrival are byside the entrance door of Building B. cannot really miss it. Information and Code for keysafe will be send if guest cannot arrive before 8pm.
+
 ONLINE CHECK-IN | Link for Online-Check-in will be send automatically 3 days before Arrival date. The online-check-in is mandatory by law, and is also necessary to get the Guest Mobility Ticket
 
 GUEST MOBILITY TICKET Guest Mobility Ticket | Guest Mobility Ticket is free ticket for the whole Duration of the stay. It allows guest to use all public Transportation in Salzburg Province free of charge. During Online-Check-In make sure, to mark every one to receive the ticket. here is Website for more Information: https://www.guestmobilityticket.at/en/

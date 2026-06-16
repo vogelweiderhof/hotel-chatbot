@@ -1,0 +1,57 @@
+{
+  "q": 10,
+  "tk": 7863,
+  "pt": 7651,
+  "ct": 212,
+  "cost": 0.0015726,
+  "topQ": {
+    "how to get to old town?": 2,
+    "breakfast hours?": 2,
+    "wifi password?": 2,
+    "check-in time?": 2,
+    "where is the keysafe for late arrival?": 1,
+    "keysafe for latearrival": 1
+  },
+  "sessions": [
+    "::1"
+  ],
+  "byCat": {
+    "gen": 7863
+  },
+  "recent": [
+    {
+      "ts": "2026-06-16T10:43:08.850Z",
+      "pt": 1963,
+      "ct": 66,
+      "tk": 2029,
+      "cost": "0.000406",
+      "cat": "gen"
+    },
+    {
+      "ts": "2026-06-16T10:42:57.350Z",
+      "pt": 1904,
+      "ct": 42,
+      "tk": 1946,
+      "cost": "0.000389",
+      "cat": "gen"
+    },
+    {
+      "ts": "2026-06-16T10:41:25.108Z",
+      "pt": 1933,
+      "ct": 40,
+      "tk": 1973,
+      "cost": "0.000395",
+      "cat": "gen"
+    },
+    {
+      "ts": "2026-06-16T10:41:08.702Z",
+      "pt": 1851,
+      "ct": 64,
+      "tk": 1915,
+      "cost": "0.000383",
+      "cat": "gen"
+    }
+  ],
+  "startTime": 1781606450801,
+  "savedAt": 1781608091671
+}

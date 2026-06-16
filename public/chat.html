@@ -170,7 +170,7 @@
             position: fixed;
             top: 15px;
             left: 15px;
-            width: 250px;
+            width: 260px;
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.12);
@@ -213,24 +213,24 @@
         .weather-section {
             background: #f8f5f0;
             border-radius: 8px;
-            padding: 8px 10px;
-            margin-bottom: 10px;
+            padding: 6px 8px;
+            margin-bottom: 8px;
             text-align: center;
         }
         .weather-section .temp {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             color: #3A5E3C;
         }
         .weather-section .condition {
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
         }
         .weather-forecast {
             display: flex;
             justify-content: space-around;
-            margin-top: 5px;
-            font-size: 10px;
+            margin-top: 4px;
+            font-size: 9px;
             color: #555;
         }
         .weather-forecast .day {
@@ -240,38 +240,72 @@
         .weather-forecast .day .low { color: #888; }
         
         .bus-line {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             border-bottom: 1px solid #eee;
-            padding-bottom: 8px;
+            padding-bottom: 6px;
         }
         .bus-line h4 {
-            margin: 0 0 5px 0;
-            font-size: 11px;
+            margin: 0 0 4px 0;
+            font-size: 10px;
             color: #3A5E3C;
         }
-        .bus-departure {
+        
+        /* Horizontal times (Bus 21) */
+        .bus-times-horizontal {
             display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-            font-size: 12px;
-            border-bottom: 1px dashed #f0f0f0;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 2px 0;
         }
-        .bus-time {
+        .bus-times-horizontal .time-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+        }
+        .bus-times-horizontal .time-item .time {
             font-weight: bold;
             color: #D4A373;
-            font-size: 14px;
         }
-        .bus-delay {
+        .bus-times-horizontal .time-item .delay {
+            color: #e74c3c;
+            font-size: 10px;
+        }
+        
+        /* Vertical times (Bus 120/121) */
+        .bus-times-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            padding: 2px 0;
+        }
+        .bus-times-vertical .time-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            padding: 1px 0;
+            border-bottom: 1px dashed #f0f0f0;
+        }
+        .bus-times-vertical .time-item .time {
+            font-weight: bold;
+            color: #D4A373;
+        }
+        .bus-times-vertical .time-item .bus-label {
+            color: #888;
+            font-size: 10px;
+        }
+        .bus-times-vertical .time-item .delay {
             color: #e74c3c;
             font-size: 10px;
         }
         
         .bus-last-updated {
-            font-size: 9px;
+            font-size: 8px;
             color: #999;
             text-align: center;
-            margin-top: 6px;
-            padding-top: 5px;
+            margin-top: 5px;
+            padding-top: 4px;
             border-top: 1px solid #eee;
         }
         
@@ -281,9 +315,9 @@
             color: white;
             padding: 3px 8px;
             border-radius: 12px;
-            font-size: 10px;
+            font-size: 9px;
             cursor: pointer;
-            margin-top: 5px;
+            margin-top: 4px;
             width: 100%;
         }
         .refresh-btn:hover { background: #c49162; }
@@ -291,19 +325,20 @@
         .loading-bus, .error-bus {
             text-align: center;
             color: #999;
-            font-size: 11px;
-            padding: 8px;
+            font-size: 10px;
+            padding: 6px;
         }
         .error-bus { color: #e74c3c; }
         
         @media (max-width: 600px) {
             body { padding: 0; }
             .chat-container { height: 100vh; border-radius: 0; }
-            .bus-overlay { width: 210px; top: 10px; left: 10px; }
+            .bus-overlay { width: 220px; top: 10px; left: 10px; }
             .bus-overlay-header { font-size: 10px; padding: 5px 8px; }
-            .weather-section .temp { font-size: 17px; }
-            .weather-forecast { font-size: 9px; }
-            .bus-time { font-size: 12px; }
+            .weather-section .temp { font-size: 16px; }
+            .weather-forecast { font-size: 8px; }
+            .bus-times-horizontal .time-item { font-size: 12px; }
+            .bus-times-vertical .time-item { font-size: 12px; }
         }
     </style>
 </head>
@@ -469,7 +504,6 @@ I'm your AI assistant. I can help with:
                 html += `<div class="day">
                     <div>${day.day}</div>
                     <div><span class="high">${day.high}°</span> <span class="low">${day.low}°</span></div>
-                    <div style="font-size:8px;color:#999;">${day.condition}</div>
                 </div>`;
             }
             html += `</div></div>`;
@@ -484,35 +518,42 @@ I'm your AI assistant. I can help with:
             }
             let html = '';
             
-            // Bus 21
-            html += `<div class="bus-line"><h4>🚌 Bus 21 → City Center</h4>`;
+            // Bus 21 → City Center (Fürstenbrunn) - HORIZONTAL, 3 times
+            html += `<div class="bus-line"><h4>🚌 Bus 21 → City Center (Fürstenbrunn)</h4>`;
+            html += `<div class="bus-times-horizontal">`;
             const b21 = data.bus21?.times || [];
             if (b21.length > 0) {
-                for (const t of b21.slice(0, 5)) {
-                    html += `<div class="bus-departure">
-                        <span class="bus-time">${t.time}</span>
-                        ${t.delay ? `<span class="bus-delay">+${t.delay}m</span>` : ''}
-                    </div>`;
+                const nextThree = b21.slice(0, 3);
+                for (const t of nextThree) {
+                    html += `<span class="time-item">
+                        <span class="time">${t.time}</span>
+                        ${t.delay ? `<span class="delay">+${t.delay}m</span>` : ''}
+                    </span>`;
                 }
             } else {
-                html += `<div class="bus-departure">No departures found</div>`;
+                html += `<span style="color:#999;font-size:10px;">No departures</span>`;
             }
-            html += '</div>';
+            html += `</div></div>`;
             
-            // Bus 120
-            html += `<div class="bus-line"><h4>🚌 Bus 120 → Train Station</h4>`;
+            // Bus 120/121 → Train Station (Hauptbahnhof) - VERTICAL with labels, 3 times
+            html += `<div class="bus-line"><h4>🚌 Bus 120/121 → Train Station (Hauptbahnhof)</h4>`;
+            html += `<div class="bus-times-vertical">`;
+            
             const b120 = data.bus120?.times || [];
             if (b120.length > 0) {
-                for (const t of b120.slice(0, 5)) {
-                    html += `<div class="bus-departure">
-                        <span class="bus-time">${t.time}</span>
-                        ${t.delay ? `<span class="bus-delay">+${t.delay}m</span>` : ''}
+                const nextThree = b120.slice(0, 3);
+                for (const t of nextThree) {
+                    const busLabel = t.busNumber || '120';
+                    html += `<div class="time-item">
+                        <span class="time">${t.time}</span>
+                        <span class="bus-label">(${busLabel})</span>
+                        ${t.delay ? `<span class="delay">+${t.delay}m</span>` : ''}
                     </div>`;
                 }
             } else {
-                html += `<div class="bus-departure">No departures found</div>`;
+                html += `<div style="color:#999;font-size:10px;">No departures</div>`;
             }
-            html += '</div>';
+            html += `</div></div>`;
             
             div.innerHTML = html;
         }
@@ -523,7 +564,6 @@ I'm your AI assistant. I can help with:
             weatherDiv.innerHTML = '<div class="loading-bus">Loading weather...</div>';
             busDiv.innerHTML = '<div class="loading-bus">Loading bus times...</div>';
             
-            // Fetch both in parallel
             const [w, b] = await Promise.all([fetchWeather(), fetchBusTimes()]);
             
             if (w) renderWeather(w);
@@ -538,10 +578,8 @@ I'm your AI assistant. I can help with:
         function initOverlay() {
             fetchAllData();
             if (overlayInterval) clearInterval(overlayInterval);
-            // Refresh every 60 seconds for buses, weather refreshes on its own cache
             overlayInterval = setInterval(() => {
                 fetchBusTimes().then(b => { if (b) renderBus(b); });
-                // Weather refreshes every 10 minutes via cache
                 if (!weatherData || Date.now() - weatherData._fetched > 600000) {
                     fetchWeather().then(w => { if (w) renderWeather(w); });
                 }
