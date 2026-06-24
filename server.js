@@ -213,60 +213,58 @@ async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = 
     }
 }
 
-// ========== DEDICATED BUS API ENDPOINT (WITH DETAILED LOGGING) ==========
+// ========== TIMEZONE CORRECTION FUNCTION ==========
+function convertToLocalTime(utcTimeStr) {
+    if (!utcTimeStr || utcTimeStr === '--:--') return utcTimeStr;
+    
+    // Parse the UTC time (e.g., "14:58")
+    const [hours, minutes] = utcTimeStr.split(':').map(Number);
+    
+    // Create a date object in UTC
+    const utcDate = new Date();
+    utcDate.setUTCHours(hours, minutes, 0, 0);
+    
+    // Get local time string in Europe/Vienna timezone
+    const localTime = utcDate.toLocaleTimeString('en-GB', {
+        timeZone: 'Europe/Vienna',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    
+    return localTime;
+}
+
+// ========== DEDICATED BUS API ENDPOINT (WITH TIMEZONE FIX) ==========
 app.get('/api/bus-times', async (req, res) => {
     const now = Date.now();
     if (busDataCache.data && busDataCache.timestamp && (now - busDataCache.timestamp) < busDataCache.expiryMs) {
-        console.log('📦 Returning cached bus data');
         return res.json(busDataCache.data);
     }
     
-    console.log('🔄 Fetching fresh bus data...');
-    
     try {
         // Bus 21 to City Center
-        console.log('📊 Fetching Bus 21...');
         const hotelDepartures = await getRealTimeDepartures("Baron Schwarz Park", 30, "21");
-        console.log(`   Bus 21 found: ${hotelDepartures ? hotelDepartures.length : 0} departures`);
-        
         const cityCenterBuses = hotelDepartures ? hotelDepartures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn')) : [];
-        console.log(`   Bus 21 to City Center: ${cityCenterBuses.length} departures`);
         
         // Bus 120
-        console.log('📊 Fetching Bus 120...');
         const bus120Departures = await getRealTimeDepartures("Baron Schwarz Park", 30, "120");
-        console.log(`   Bus 120 found: ${bus120Departures ? bus120Departures.length : 0} departures`);
-        
-        if (bus120Departures && bus120Departures.length > 0) {
-            console.log('   Bus 120 directions:', bus120Departures.slice(0, 8).map(b => ({ dir: b.direction, time: b.departureTime })));
-        }
-        
         const trainStationBuses120 = bus120Departures ? bus120Departures.filter(d => 
             d.direction.toLowerCase().includes('hauptbahnhof') || 
             d.direction.toLowerCase().includes('hbf') ||
             d.direction.toLowerCase().includes('bahnhof')
         ) : [];
-        console.log(`   Bus 120 to Train: ${trainStationBuses120.length} departures`);
         
         // Bus 121
-        console.log('📊 Fetching Bus 121...');
         const bus121Departures = await getRealTimeDepartures("Baron Schwarz Park", 30, "121");
-        console.log(`   Bus 121 found: ${bus121Departures ? bus121Departures.length : 0} departures`);
-        
-        if (bus121Departures && bus121Departures.length > 0) {
-            console.log('   Bus 121 directions:', bus121Departures.slice(0, 8).map(b => ({ dir: b.direction, time: b.departureTime })));
-        }
-        
         const trainStationBuses121 = bus121Departures ? bus121Departures.filter(d => 
             d.direction.toLowerCase().includes('hauptbahnhof') || 
             d.direction.toLowerCase().includes('hbf') ||
             d.direction.toLowerCase().includes('bahnhof')
         ) : [];
-        console.log(`   Bus 121 to Train: ${trainStationBuses121.length} departures`);
         
-        // Combine and sort
+        // Combine Bus 120 and Bus 121 times
         const combinedTrainBuses = [...trainStationBuses120, ...trainStationBuses121];
-        console.log(`   Combined train buses: ${combinedTrainBuses.length} departures`);
         combinedTrainBuses.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
         
         // Remove duplicates
@@ -278,19 +276,26 @@ app.get('/api/bus-times', async (req, res) => {
                 uniqueTrainBuses.push(bus);
             }
         }
-        console.log(`   Unique train buses: ${uniqueTrainBuses.length} departures`);
         
-        if (uniqueTrainBuses.length > 0) {
-            console.log('   Final train bus times:', uniqueTrainBuses.slice(0, 6).map(b => ({ time: b.departureTime, bus: b.busNumber })));
-        }
+        // Apply timezone correction to Bus 21 times
+        const correctedCityCenterBuses = cityCenterBuses.map(b => ({
+            ...b,
+            departureTime: convertToLocalTime(b.departureTime)
+        }));
+        
+        // Apply timezone correction to Train buses
+        const correctedTrainBuses = uniqueTrainBuses.map(b => ({
+            ...b,
+            departureTime: convertToLocalTime(b.departureTime)
+        }));
         
         const busData = {
             timestamp: new Date().toISOString(),
             bus21: { 
-                times: cityCenterBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) 
+                times: correctedCityCenterBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) 
             },
             bus120: { 
-                times: uniqueTrainBuses.slice(0, 6).map(b => ({ 
+                times: correctedTrainBuses.slice(0, 6).map(b => ({ 
                     time: b.departureTime, 
                     delay: b.delay,
                     busNumber: b.busNumber 
@@ -299,7 +304,6 @@ app.get('/api/bus-times', async (req, res) => {
         };
         
         busDataCache = { data: busData, timestamp: now, expiryMs: 60000 };
-        console.log('✅ Bus data cached');
         res.json(busData);
         
     } catch (error) {
@@ -888,6 +892,11 @@ app.post('/api/restore-backup', (req, res) => {
     }
 });
 
+// ========== HEALTH CHECK ENDPOINT (for Render ping) ==========
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 // ========== MAIN CHAT ENDPOINT ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -1008,13 +1017,14 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
-    console.log(`🚆 Bus API: ENABLED (cached 60s)`);
+    console.log(`🚆 Bus API: ENABLED (cached 60s, with timezone fix)`);
     console.log(`🌤️ Weather API: ENABLED (cached 10min)`);
     console.log(`📊 Hardcoded responses: ENABLED (check-in, wifi, breakfast, etc.)`);
     console.log(`💾 Conversation: last 4 messages only (reduced tokens)`);
     console.log(`📁 Analytics: Auto-save every 5 min / 10 questions`);
     console.log(`📁 Daily backups: Keeps last 3 days`);
     console.log(`📁 Monthly backups: End of each month`);
+    console.log(`❤️ Health check: /health (for Render ping)`);
     console.log(`📋 FAQ loaded: ${loadFAQs() !== "No FAQ" ? "YES" : "NO"}`);
     console.log(`\n✅ Token savings implemented:`);
     console.log(`   • Hardcoded common questions (100% savings)`);
@@ -1026,6 +1036,7 @@ app.listen(PORT, () => {
     console.log(`   • ${analytics.q} questions tracked so far`);
     console.log(`   • $${analytics.cost.toFixed(4)} total cost`);
     console.log(`   • ${analytics.sessions.size} unique sessions`);
-    console.log(`\n📊 Bus 120/121 debug logging ENABLED`);
-    console.log(`   • Check console when /api/bus-times is called\n`);
+    console.log(`\n✅ Timezone fix applied:`);
+    console.log(`   • Bus times converted from UTC to Europe/Vienna local time`);
+    console.log(`   • Automatically handles daylight saving time\n`);
 });
