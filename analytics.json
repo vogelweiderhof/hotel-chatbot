@@ -1,24 +1,105 @@
 {
-  "q": 10,
-  "tk": 7863,
-  "pt": 7651,
-  "ct": 212,
-  "cost": 0.0015726,
+  "q": 20,
+  "tk": 32603,
+  "pt": 31628,
+  "ct": 975,
+  "cost": 0.0041992,
+  "inputCost": 0.0023977,
+  "outputCost": 0.00022889999999999998,
   "topQ": {
     "how to get to old town?": 2,
     "breakfast hours?": 2,
     "wifi password?": 2,
     "check-in time?": 2,
     "where is the keysafe for late arrival?": 1,
-    "keysafe for latearrival": 1
+    "keysafe for latearrival": 1,
+    "wie heißt du?": 1,
+    "wieviel uhr haben wir?": 1,
+    "wann fährt nächste bus 21 vom hotel ab?": 1,
+    "hallo": 1,
+    "nächster  bus in richtung stadtzenztrum": 1,
+    "wann fährt nächster bus ab?": 1,
+    "weather today": 1
   },
   "sessions": [
     "::1"
   ],
   "byCat": {
-    "gen": 7863
+    "gen": 19396,
+    "bus": 10343,
+    "wthr": 2864
   },
   "recent": [
+    {
+      "ts": "2026-07-02T11:41:23.793Z",
+      "pt": 2818,
+      "ct": 46,
+      "tk": 2864,
+      "inputCost": "0.000282",
+      "outputCost": "0.000014",
+      "cost": "0.000296",
+      "cat": "wthr"
+    },
+    {
+      "ts": "2026-07-02T11:27:48.359Z",
+      "pt": 2751,
+      "ct": 81,
+      "tk": 2832,
+      "inputCost": "0.000275",
+      "outputCost": "0.000024",
+      "cost": "0.000299",
+      "cat": "bus"
+    },
+    {
+      "ts": "2026-07-02T11:27:32.296Z",
+      "pt": 2659,
+      "ct": 80,
+      "tk": 2739,
+      "inputCost": "0.000266",
+      "outputCost": "0.000024",
+      "cost": "0.000290",
+      "cat": "bus"
+    },
+    {
+      "ts": "2026-07-02T11:27:21.382Z",
+      "pt": 2633,
+      "ct": 13,
+      "tk": 2646,
+      "inputCost": "0.000263",
+      "outputCost": "0.000004",
+      "cost": "0.000267",
+      "cat": "gen"
+    },
+    {
+      "ts": "2026-07-02T11:16:45.131Z",
+      "pt": 4526,
+      "ct": 246,
+      "tk": 4772,
+      "inputCost": "0.000453",
+      "outputCost": "0.000074",
+      "cost": "0.000526",
+      "cat": "bus"
+    },
+    {
+      "ts": "2026-07-02T11:16:24.575Z",
+      "pt": 4356,
+      "ct": 154,
+      "tk": 4510,
+      "inputCost": "0.000436",
+      "outputCost": "0.000046",
+      "cost": "0.000482",
+      "cat": "gen"
+    },
+    {
+      "ts": "2026-07-02T11:16:08.825Z",
+      "pt": 4234,
+      "ct": 143,
+      "tk": 4377,
+      "inputCost": "0.000423",
+      "outputCost": "0.000043",
+      "cost": "0.000466",
+      "cat": "gen"
+    },
     {
       "ts": "2026-06-16T10:43:08.850Z",
       "pt": 1963,
@@ -53,5 +134,5 @@
     }
   ],
   "startTime": 1781606450801,
-  "savedAt": 1781608091671
+  "savedAt": 1782994006382
 }
