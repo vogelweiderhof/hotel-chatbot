@@ -5,10 +5,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
-
+// ========== GET CURRENT DIRECTORY ==========
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ========== LOAD .ENV FROM THE CORRECT PATH ==========
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+// ========== DEBUG: CHECK IF KEY IS LOADED ==========
+console.log('🔍 Environment check:');
+console.log('  📁 Current directory:', __dirname);
+console.log('  📄 Looking for .env at:', path.join(__dirname, '.env'));
+console.log('  🔑 MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY ? '✅ Found (length: ' + process.env.MISTRAL_API_KEY.length + ')' : '❌ MISSING');
+console.log('  🚪 PORT:', process.env.PORT || '3000 (default)');
 
 const app = express();
 app.use(express.json());
@@ -1271,6 +1280,7 @@ app.listen(PORT, () => {
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
     console.log(`🤖 AI: Mistral Small 2501 (EU-hosted, GDPR-compliant)`);
     console.log(`💰 Pricing: Input $0.10/1M | Output $0.30/1M tokens`);
+    console.log(`🔑 API Key: ${process.env.MISTRAL_API_KEY ? '✅ Loaded' : '❌ MISSING'}`);
     console.log(`🚆 Bus API: ENABLED (cached 60s, with timezone fix)`);
     console.log(`🌤️ Weather API: ENABLED (cached 10min)`);
     console.log(`📊 Hardcoded responses: ENABLED (check-in, wifi, breakfast, etc.)`);
