@@ -231,7 +231,7 @@ function convertToLocalTime(utcTimeStr) {
     return localTime;
 }
 
-// ========== WEATHER DATA FUNCTION (MET NORWAY) ==========
+// ========== WEATHER DATA FUNCTION (MET NORWAY - FIXED) ==========
 // MET Norway API - Free for commercial use, no API key required
 // Requires User-Agent with email for identification
 // Rate limit: 20 requests/second (very generous)
@@ -263,46 +263,14 @@ async function getWeatherData() {
             return null;
         }
 
-        // Current weather (first entry)
+        // ========== CURRENT WEATHER ==========
         const currentData = timeseries[0].data.instant.details;
-        const currentTime = new Date(timeseries[0].time);
-
-        // Forecast (next 3 entries - approximately 3, 6, 9 hours ahead)
-        const forecastData = timeseries.slice(1, 4).map(item => ({
-            time: new Date(item.time),
-            details: item.data.next_1_hours?.details || item.data.instant.details
-        }));
-
-        // Map weather code to condition string
-        // MET Norway uses symbols from: https://api.met.no/weatherapi/weathericon/2.0/documentation
-        function getCondition(symbolCode) {
-            if (!symbolCode) return 'Unknown';
-            const conditions = {
-                'clearsky': 'Clear',
-                'fair': 'Fair',
-                'partlycloudy': 'Partly cloudy',
-                'cloudy': 'Cloudy',
-                'rain': 'Rain',
-                'heavyrain': 'Heavy rain',
-                'rainshowers': 'Rain showers',
-                'heavyrainshowers': 'Heavy rain showers',
-                'snow': 'Snow',
-                'heavysnow': 'Heavy snow',
-                'snowshowers': 'Snow showers',
-                'heavyrainshowers': 'Heavy rain showers',
-                'fog': 'Fog',
-                'thunder': 'Thunderstorm',
-                'sleet': 'Sleet'
-            };
-            return conditions[symbolCode] || symbolCode || 'Unknown';
-        }
-
-        // Get condition from current data
         let currentCondition = 'Unknown';
+        
+        // Try to get condition from symbol_code
         if (currentData.symbol_code) {
-            currentCondition = getCondition(currentData.symbol_code);
+            currentCondition = getConditionFromSymbol(currentData.symbol_code);
         } else if (currentData.cloud_area_fraction !== undefined) {
-            // Fallback: estimate from cloud cover
             const cloud = currentData.cloud_area_fraction;
             if (cloud < 20) currentCondition = 'Clear';
             else if (cloud < 50) currentCondition = 'Partly cloudy';
@@ -310,26 +278,92 @@ async function getWeatherData() {
             else currentCondition = 'Overcast';
         }
 
-        // Build forecast with conditions
-        const forecast = forecastData.map(item => {
-            const details = item.details;
+        // ========== FORECAST (Next 3 days) ==========
+        // Group forecast by day
+        const dailyForecasts = {};
+        
+        for (let i = 1; i < Math.min(timeseries.length, 12); i++) {
+            const item = timeseries[i];
+            const date = new Date(item.time);
+            const dayKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+            
+            // Get temperature for this time slot
+            let temp = null;
             let condition = 'Unknown';
-            if (details.symbol_code) {
-                condition = getCondition(details.symbol_code);
-            } else if (details.cloud_area_fraction !== undefined) {
-                const cloud = details.cloud_area_fraction;
-                if (cloud < 20) condition = 'Clear';
-                else if (cloud < 50) condition = 'Partly cloudy';
-                else if (cloud < 80) condition = 'Cloudy';
-                else condition = 'Overcast';
+            
+            // Try to get temperature from next_1_hours or instant
+            if (item.data.next_1_hours && item.data.next_1_hours.details) {
+                const details = item.data.next_1_hours.details;
+                temp = details.air_temperature;
+                if (details.symbol_code) {
+                    condition = getConditionFromSymbol(details.symbol_code);
+                }
+            } else if (item.data.instant && item.data.instant.details) {
+                const details = item.data.instant.details;
+                temp = details.air_temperature;
+                if (details.symbol_code) {
+                    condition = getConditionFromSymbol(details.symbol_code);
+                }
             }
-            return {
-                day: item.time.toLocaleDateString('en-US', { weekday: 'short' }),
-                high: details.air_temperature_max !== undefined ? Math.round(details.air_temperature_max) : '--',
-                low: details.air_temperature_min !== undefined ? Math.round(details.air_temperature_min) : '--',
+            
+            if (temp !== null) {
+                if (!dailyForecasts[dayKey]) {
+                    dailyForecasts[dayKey] = {
+                        temps: [],
+                        conditions: [],
+                        date: date
+                    };
+                }
+                dailyForecasts[dayKey].temps.push(temp);
+                if (condition !== 'Unknown') {
+                    dailyForecasts[dayKey].conditions.push(condition);
+                }
+            }
+        }
+        
+        // Build forecast array (max 3 days)
+        const forecast = [];
+        const dayKeys = Object.keys(dailyForecasts).slice(0, 3);
+        
+        for (const key of dayKeys) {
+            const dayData = dailyForecasts[key];
+            const temps = dayData.temps;
+            
+            // Get most common condition
+            let condition = 'Unknown';
+            if (dayData.conditions.length > 0) {
+                const conditionCounts = {};
+                for (const c of dayData.conditions) {
+                    conditionCounts[c] = (conditionCounts[c] || 0) + 1;
+                }
+                let maxCount = 0;
+                for (const [c, count] of Object.entries(conditionCounts)) {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        condition = c;
+                    }
+                }
+            }
+            
+            forecast.push({
+                day: dayData.date.toLocaleDateString('en-US', { weekday: 'short' }),
+                high: Math.round(Math.max(...temps)),
+                low: Math.round(Math.min(...temps)),
                 condition: condition
-            };
-        });
+            });
+        }
+
+        // If we have fewer than 3 forecast days, fill with placeholder
+        while (forecast.length < 3) {
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + forecast.length + 1);
+            forecast.push({
+                day: futureDate.toLocaleDateString('en-US', { weekday: 'short' }),
+                high: '--',
+                low: '--',
+                condition: 'Unknown'
+            });
+        }
 
         return {
             city: 'Salzburg',
@@ -350,6 +384,33 @@ async function getWeatherData() {
     }
 }
 
+// ========== HELPER: Map MET Norway symbol codes to readable conditions ==========
+function getConditionFromSymbol(symbolCode) {
+    if (!symbolCode) return 'Unknown';
+    
+    // Remove suffixes like '_day', '_night', '_polartwilight'
+    const cleanCode = symbolCode.split('_')[0];
+    
+    const conditions = {
+        'clearsky': 'Clear',
+        'fair': 'Fair',
+        'partlycloudy': 'Partly cloudy',
+        'cloudy': 'Cloudy',
+        'rain': 'Rain',
+        'heavyrain': 'Heavy rain',
+        'rainshowers': 'Rain showers',
+        'heavyrainshowers': 'Heavy rain showers',
+        'snow': 'Snow',
+        'heavysnow': 'Heavy snow',
+        'snowshowers': 'Snow showers',
+        'heavyrainandrain': 'Rain',
+        'fog': 'Fog',
+        'thunder': 'Thunderstorm',
+        'sleet': 'Sleet'
+    };
+    
+    return conditions[cleanCode] || cleanCode || 'Unknown';
+}
 // ========== BUS SCHEDULE HELPER FUNCTIONS ==========
 
 async function getBusSchedule(busNumber, direction = 'citycenter') {
