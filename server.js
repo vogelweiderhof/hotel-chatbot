@@ -1086,8 +1086,7 @@ app.post('/api/chat', async (req, res) => {
         
         try {
             // Fetch weather data from the existing endpoint
-            const weatherResponse = await axios.get(`http://localhost:${PORT}/api/weather`);
-            const weatherData = weatherResponse.data;
+		const weatherData = await getWeatherData(); // Call the function directly
             
             let reply = '';
             
