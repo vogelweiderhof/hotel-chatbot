@@ -5,19 +5,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// ========== GET CURRENT DIRECTORY ==========
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// ========== LOAD .ENV FROM THE CORRECT PATH ==========
-dotenv.config({ path: path.join(__dirname, '.env') });
-
-// ========== DEBUG: CHECK IF KEY IS LOADED ==========
-console.log('🔍 Environment check:');
-console.log('  📁 Current directory:', __dirname);
-console.log('  📄 Looking for .env at:', path.join(__dirname, '.env'));
-console.log('  🔑 MISTRAL_API_KEY:', process.env.MISTRAL_API_KEY ? '✅ Found (length: ' + process.env.MISTRAL_API_KEY.length + ')' : '❌ MISSING');
-console.log('  🚪 PORT:', process.env.PORT || '3000 (default)');
 
 const app = express();
 app.use(express.json());
@@ -381,25 +372,14 @@ app.get('/api/bus-times', async (req, res) => {
     }
 });
 
-// ========== WEATHER API ==========
-let weatherCache = {
-    data: null,
-    timestamp: null,
-    expiryMs: 600000
-};
-
-app.get('/api/weather', async (req, res) => {
-    const now = Date.now();
-    if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
-        return res.json(weatherCache.data);
-    }
-    
+// ========== WEATHER DATA FUNCTION ==========
+async function getWeatherData() {
     try {
         const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
         const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
         
         if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
-            return res.status(500).json({ error: 'Location not found' });
+            return null;
         }
         
         const location = geoResponse.data.results[0];
@@ -409,7 +389,7 @@ app.get('/api/weather', async (req, res) => {
         const current = weatherResponse.data.current_weather;
         const daily = weatherResponse.data.daily;
         
-        if (!current) return res.status(500).json({ error: 'No weather data' });
+        if (!current) return null;
         
         const weatherCodes = {
             0: "Clear", 1: "Clear", 2: "Partly cloudy", 3: "Cloudy",
@@ -417,7 +397,7 @@ app.get('/api/weather', async (req, res) => {
             71: "Snow", 73: "Snow", 75: "Heavy snow", 95: "Thunder"
         };
         
-        const weatherData = {
+        return {
             city: location.name,
             current: {
                 temp: current.temperature,
@@ -431,12 +411,30 @@ app.get('/api/weather', async (req, res) => {
                 condition: weatherCodes[daily.weather_code[i]] || "Unknown"
             }))
         };
-        
+    } catch (error) {
+        console.log('Weather API error:', error.message);
+        return null;
+    }
+}
+
+// ========== WEATHER API ENDPOINT ==========
+let weatherCache = {
+    data: null,
+    timestamp: null,
+    expiryMs: 600000
+};
+
+app.get('/api/weather', async (req, res) => {
+    const now = Date.now();
+    if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
+        return res.json(weatherCache.data);
+    }
+    
+    const weatherData = await getWeatherData();
+    if (weatherData) {
         weatherCache = { data: weatherData, timestamp: now, expiryMs: 600000 };
         res.json(weatherData);
-        
-    } catch (error) {
-        console.error('Weather API error:', error.message);
+    } else {
         res.status(500).json({ error: 'Failed to fetch weather' });
     }
 });
@@ -1085,8 +1083,12 @@ app.post('/api/chat', async (req, res) => {
         else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
         
         try {
-            // Fetch weather data from the existing endpoint
-		const weatherData = await getWeatherData(); // Call the function directly
+            // ✅ FIX: Call the function directly instead of making an HTTP request
+            const weatherData = await getWeatherData();
+            
+            if (!weatherData) {
+                throw new Error('No weather data');
+            }
             
             let reply = '';
             
