@@ -231,55 +231,121 @@ function convertToLocalTime(utcTimeStr) {
     return localTime;
 }
 
-// ========== WEATHER DATA FUNCTION ==========
-// ✅ MOVED HERE - BEFORE the chat endpoint so it's accessible
+// ========== WEATHER DATA FUNCTION (MET NORWAY) ==========
+// MET Norway API - Free for commercial use, no API key required
+// Requires User-Agent with email for identification
+// Rate limit: 20 requests/second (very generous)
+// Source: https://api.met.no/weatherapi/locationforecast/2.0/documentation
+
 async function getWeatherData() {
+    const lat = 47.80949;  // Salzburg latitude
+    const lon = 13.05501;  // Salzburg longitude
+    const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
+
     try {
-        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
-        const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
+        console.log('🌤️ Weather: Fetching from MET Norway...');
         
-        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
-            console.log('🌤️ Weather: Location not found');
-            return null;
-        }
-        
-        const location = geoResponse.data.results[0];
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
-        const weatherResponse = await axios.get(weatherUrl, { timeout: 8000 });
-        
-        const current = weatherResponse.data.current_weather;
-        const daily = weatherResponse.data.daily;
-        
-        if (!current) {
-            console.log('🌤️ Weather: No current weather data');
-            return null;
-        }
-        
-        const weatherCodes = {
-            0: "Clear", 1: "Clear", 2: "Partly cloudy", 3: "Cloudy",
-            45: "Fog", 51: "Drizzle", 61: "Rain", 63: "Rain", 65: "Heavy rain",
-            71: "Snow", 73: "Snow", 75: "Heavy snow", 95: "Thunder"
-        };
-        
-        const weatherData = {
-            city: location.name,
-            current: {
-                temp: current.temperature,
-                condition: weatherCodes[current.weathercode] || "Unknown",
-                wind: current.windspeed
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Hotel Vogelweiderhof Chatbot (office@vogelweiderhof.at)'
             },
-            forecast: daily.time.slice(0, 3).map((time, i) => ({
-                day: new Date(time).toLocaleDateString('en-US', { weekday: 'short' }),
-                high: daily.temperature_2m_max[i],
-                low: daily.temperature_2m_min[i],
-                condition: weatherCodes[daily.weather_code[i]] || "Unknown"
-            }))
+            timeout: 10000
+        });
+
+        if (!response.data || !response.data.properties || !response.data.properties.timeseries) {
+            console.log('🌤️ Weather: Invalid response from MET Norway');
+            return null;
+        }
+
+        const timeseries = response.data.properties.timeseries;
+        if (timeseries.length === 0) {
+            console.log('🌤️ Weather: No timeseries data');
+            return null;
+        }
+
+        // Current weather (first entry)
+        const currentData = timeseries[0].data.instant.details;
+        const currentTime = new Date(timeseries[0].time);
+
+        // Forecast (next 3 entries - approximately 3, 6, 9 hours ahead)
+        const forecastData = timeseries.slice(1, 4).map(item => ({
+            time: new Date(item.time),
+            details: item.data.next_1_hours?.details || item.data.instant.details
+        }));
+
+        // Map weather code to condition string
+        // MET Norway uses symbols from: https://api.met.no/weatherapi/weathericon/2.0/documentation
+        function getCondition(symbolCode) {
+            if (!symbolCode) return 'Unknown';
+            const conditions = {
+                'clearsky': 'Clear',
+                'fair': 'Fair',
+                'partlycloudy': 'Partly cloudy',
+                'cloudy': 'Cloudy',
+                'rain': 'Rain',
+                'heavyrain': 'Heavy rain',
+                'rainshowers': 'Rain showers',
+                'heavyrainshowers': 'Heavy rain showers',
+                'snow': 'Snow',
+                'heavysnow': 'Heavy snow',
+                'snowshowers': 'Snow showers',
+                'heavyrainshowers': 'Heavy rain showers',
+                'fog': 'Fog',
+                'thunder': 'Thunderstorm',
+                'sleet': 'Sleet'
+            };
+            return conditions[symbolCode] || symbolCode || 'Unknown';
+        }
+
+        // Get condition from current data
+        let currentCondition = 'Unknown';
+        if (currentData.symbol_code) {
+            currentCondition = getCondition(currentData.symbol_code);
+        } else if (currentData.cloud_area_fraction !== undefined) {
+            // Fallback: estimate from cloud cover
+            const cloud = currentData.cloud_area_fraction;
+            if (cloud < 20) currentCondition = 'Clear';
+            else if (cloud < 50) currentCondition = 'Partly cloudy';
+            else if (cloud < 80) currentCondition = 'Cloudy';
+            else currentCondition = 'Overcast';
+        }
+
+        // Build forecast with conditions
+        const forecast = forecastData.map(item => {
+            const details = item.details;
+            let condition = 'Unknown';
+            if (details.symbol_code) {
+                condition = getCondition(details.symbol_code);
+            } else if (details.cloud_area_fraction !== undefined) {
+                const cloud = details.cloud_area_fraction;
+                if (cloud < 20) condition = 'Clear';
+                else if (cloud < 50) condition = 'Partly cloudy';
+                else if (cloud < 80) condition = 'Cloudy';
+                else condition = 'Overcast';
+            }
+            return {
+                day: item.time.toLocaleDateString('en-US', { weekday: 'short' }),
+                high: details.air_temperature_max !== undefined ? Math.round(details.air_temperature_max) : '--',
+                low: details.air_temperature_min !== undefined ? Math.round(details.air_temperature_min) : '--',
+                condition: condition
+            };
+        });
+
+        return {
+            city: 'Salzburg',
+            current: {
+                temp: Math.round(currentData.air_temperature),
+                condition: currentCondition,
+                wind: Math.round(currentData.wind_speed || 0)
+            },
+            forecast: forecast
         };
-        
-        console.log('🌤️ Weather data fetched successfully');
-        return weatherData;
+
     } catch (error) {
-        console.error('🌤️ Weather API error:', error.message);
+        console.error('🌤️ MET Norway Weather API error:', error.message);
+        if (error.response) {
+            console.error('🌤️ MET Norway Response status:', error.response.status);
+        }
         return null;
     }
 }
@@ -423,23 +489,36 @@ app.get('/api/bus-times', async (req, res) => {
 });
 
 // ========== WEATHER API ENDPOINT ==========
+// ✅ Using MET Norway - Free for commercial use, no API key required
+// Cached for 30 minutes to reduce unnecessary calls
 let weatherCache = {
     data: null,
     timestamp: null,
-    expiryMs: 600000
+    expiryMs: 1800000  // 30 minutes
 };
 
 app.get('/api/weather', async (req, res) => {
     const now = Date.now();
+    
+    // Check cache first
     if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
+        console.log('🌤️ Weather: Returning cached data');
         return res.json(weatherCache.data);
     }
     
+    console.log('🌤️ Weather: Cache expired, fetching fresh data from MET Norway...');
     const weatherData = await getWeatherData();
+    
     if (weatherData) {
-        weatherCache = { data: weatherData, timestamp: now, expiryMs: 600000 };
+        weatherCache = { 
+            data: weatherData, 
+            timestamp: now, 
+            expiryMs: 1800000  // 30 minutes
+        };
+        console.log('🌤️ Weather: Fresh data cached for 30 minutes');
         res.json(weatherData);
     } else {
+        console.error('🌤️ Weather: Failed to fetch data from MET Norway');
         res.status(500).json({ error: 'Failed to fetch weather' });
     }
 });
@@ -1073,107 +1152,98 @@ app.post('/api/chat', async (req, res) => {
         return res.json({ reply: privacyReply });
     }
     
-   // ========== CHECK FOR WEATHER QUESTIONS ==========
-const weatherKeywords = [
-    'wetter', 'weather', 'temperatur', 'temperature', 'forecast', 'regen', 'rain',
-    'schnee', 'snow', 'sonne', 'sun', 'wolken', 'cloud', 'wind', 'gust',
-    'wie wird das wetter', 'what\'s the weather', 'wettervorhersage'
-];
-
-const isWeatherQuestion = weatherKeywords.some(kw => lower.includes(kw));
-
-if (isWeatherQuestion) {
-    let lang = 'en';
-    if (/[äöüß]/.test(question)) lang = 'de';
-    else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
+    // ========== CHECK FOR WEATHER QUESTIONS ==========
+    const weatherKeywords = [
+        'wetter', 'weather', 'temperatur', 'temperature', 'forecast', 'regen', 'rain',
+        'schnee', 'snow', 'sonne', 'sun', 'wolken', 'cloud', 'wind', 'gust',
+        'wie wird das wetter', 'what\'s the weather', 'wettervorhersage'
+    ];
     
-    try {
-        // ✅ DIRECT WEATHER FETCH - No external function call
-        console.log('🌤️ Weather: Direct fetch triggered by chat');
+    const isWeatherQuestion = weatherKeywords.some(kw => lower.includes(kw));
+    
+    if (isWeatherQuestion) {
+        let lang = 'en';
+        if (/[äöüß]/.test(question)) lang = 'de';
+        else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
         
-        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
-        const geoResponse = await axios.get(geoUrl, { timeout: 10000 });
-        
-        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
-            throw new Error('Location not found');
-        }
-        
-        const location = geoResponse.data.results[0];
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
-        const weatherResponse = await axios.get(weatherUrl, { timeout: 10000 });
-        
-        const current = weatherResponse.data.current_weather;
-        const daily = weatherResponse.data.daily;
-        
-        if (!current) {
-            throw new Error('No current weather data');
-        }
-        
-        const weatherCodes = {
-            0: "Clear", 1: "Clear", 2: "Partly cloudy", 3: "Cloudy",
-            45: "Fog", 51: "Drizzle", 61: "Rain", 63: "Rain", 65: "Heavy rain",
-            71: "Snow", 73: "Snow", 75: "Heavy snow", 95: "Thunder"
-        };
-        
-        let reply = '';
-        
-        if (lang === 'de') {
-            reply = `🌤️ **Wetter in ${location.name}**\n\n`;
-            reply += `**Aktuell:** ${current.temperature}°C, ${weatherCodes[current.weathercode] || "Unbekannt"}\n`;
-            reply += `**Wind:** ${current.windspeed} km/h\n\n`;
-            reply += `**3-Tage-Vorhersage:**\n`;
-            for (let i = 0; i < daily.time.length && i < 3; i++) {
-                const day = new Date(daily.time[i]);
-                const dayName = day.toLocaleDateString('de-DE', { weekday: 'short' });
-                reply += `• ${dayName}: ${daily.temperature_2m_max[i]}°C / ${daily.temperature_2m_min[i]}°C, ${weatherCodes[daily.weather_code[i]] || "Unbekannt"}\n`;
+        try {
+            // Use cached weather data or fetch fresh
+            const now = Date.now();
+            let weatherData = null;
+            
+            // Check cache first
+            if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
+                console.log('🌤️ Weather: Using cached data for chat');
+                weatherData = weatherCache.data;
+            } else {
+                console.log('🌤️ Weather: Cache expired, fetching fresh for chat');
+                weatherData = await getWeatherData();
+                if (weatherData) {
+                    weatherCache = { 
+                        data: weatherData, 
+                        timestamp: now, 
+                        expiryMs: 1800000 
+                    };
+                }
             }
-        } else if (lang === 'zh') {
-            reply = `🌤️ **${location.name}天气**\n\n`;
-            reply += `**当前:** ${current.temperature}°C, ${weatherCodes[current.weathercode] || "未知"}\n`;
-            reply += `**风速:** ${current.windspeed} km/h\n\n`;
-            reply += `**3天预报:**\n`;
-            for (let i = 0; i < daily.time.length && i < 3; i++) {
-                const day = new Date(daily.time[i]);
-                const dayName = day.toLocaleDateString('zh-CN', { weekday: 'short' });
-                reply += `• ${dayName}: ${daily.temperature_2m_max[i]}°C / ${daily.temperature_2m_min[i]}°C, ${weatherCodes[daily.weather_code[i]] || "未知"}\n`;
+            
+            if (!weatherData) {
+                throw new Error('No weather data available');
             }
-        } else {
-            reply = `🌤️ **Weather in ${location.name}**\n\n`;
-            reply += `**Current:** ${current.temperature}°C, ${weatherCodes[current.weathercode] || "Unknown"}\n`;
-            reply += `**Wind:** ${current.windspeed} km/h\n\n`;
-            reply += `**3-Day Forecast:**\n`;
-            for (let i = 0; i < daily.time.length && i < 3; i++) {
-                const day = new Date(daily.time[i]);
-                const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
-                reply += `• ${dayName}: ${daily.temperature_2m_max[i]}°C / ${daily.temperature_2m_min[i]}°C, ${weatherCodes[daily.weather_code[i]] || "Unknown"}\n`;
+            
+            let reply = '';
+            
+            if (lang === 'de') {
+                reply = `🌤️ **Wetter in ${weatherData.city}**\n\n`;
+                reply += `**Aktuell:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
+                reply += `**Wind:** ${weatherData.current.wind} km/h\n\n`;
+                reply += `**3-Tage-Vorhersage:**\n`;
+                for (const day of weatherData.forecast) {
+                    reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
+                }
+            } else if (lang === 'zh') {
+                reply = `🌤️ **${weatherData.city}天气**\n\n`;
+                reply += `**当前:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
+                reply += `**风速:** ${weatherData.current.wind} km/h\n\n`;
+                reply += `**3天预报:**\n`;
+                for (const day of weatherData.forecast) {
+                    reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
+                }
+            } else {
+                reply = `🌤️ **Weather in ${weatherData.city}**\n\n`;
+                reply += `**Current:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
+                reply += `**Wind:** ${weatherData.current.wind} km/h\n\n`;
+                reply += `**3-Day Forecast:**\n`;
+                for (const day of weatherData.forecast) {
+                    reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
+                }
             }
+            
+            // Track analytics
+            analytics.q++;
+            const norm = question.toLowerCase().substring(0, 100);
+            analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
+            checkAndSaveAnalytics();
+            
+            // Store in conversation history
+            let history = conversationMemory.get(ip) || [];
+            history.push({ role: "user", content: question.substring(0, 300) });
+            history.push({ role: "assistant", content: reply.substring(0, 500) });
+            if (history.length > 15) history.splice(0, 3);
+            conversationMemory.set(ip, history);
+            
+            return res.json({ reply });
+            
+        } catch (error) {
+            console.error('🌤️ Weather error in chat:', error.message);
+            const fallbackReply = lang === 'de' 
+                ? 'Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.'
+                : lang === 'zh'
+                ? '天气信息暂时不可用。请查看天气应用程序获取预报。'
+                : 'Weather information is currently unavailable. Please check a weather app for the forecast.';
+            return res.json({ reply: fallbackReply });
         }
-        
-        // Track analytics
-        analytics.q++;
-        const norm = question.toLowerCase().substring(0, 100);
-        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-        checkAndSaveAnalytics();
-        
-        // Store in conversation history
-        let history = conversationMemory.get(ip) || [];
-        history.push({ role: "user", content: question.substring(0, 300) });
-        history.push({ role: "assistant", content: reply.substring(0, 500) });
-        if (history.length > 15) history.splice(0, 3);
-        conversationMemory.set(ip, history);
-        
-        return res.json({ reply });
-        
-    } catch (error) {
-        console.error('🌤️ Weather error in chat:', error.message);
-        const fallbackReply = lang === 'de' 
-            ? 'Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.'
-            : lang === 'zh'
-            ? '天气信息暂时不可用。请查看天气应用程序获取预报。'
-            : 'Weather information is currently unavailable. Please check a weather app for the forecast.';
-        return res.json({ reply: fallbackReply });
     }
-}
     
     // ========== CHECK FOR BUS SCHEDULE QUESTIONS ==========
     const busKeywords = ['bus 21', 'bus21', 'bus 120', 'bus120', 'bus 121', 'bus121', 'bus 150', 'bus150', 'bus 840', 'bus840', 'bus 151', 'bus151', 'bus 25', 'bus25'];
@@ -1313,7 +1383,7 @@ app.listen(PORT, () => {
     console.log(`💰 Pricing: Input $0.10/1M | Output $0.30/1M tokens`);
     console.log(`🔑 API Key: ${process.env.MISTRAL_API_KEY ? '✅ Loaded' : '❌ MISSING'}`);
     console.log(`🚆 Bus API: ENABLED (cached 60s, with timezone fix)`);
-    console.log(`🌤️ Weather API: ENABLED (cached 10min)`);
+    console.log(`🌤️ Weather API: ENABLED (MET Norway - free for commercial use, cached 30min)`);
     console.log(`📊 Hardcoded responses: ENABLED (check-in, wifi, breakfast, etc.)`);
     console.log(`💾 Conversation: last 4 messages only (reduced tokens)`);
     console.log(`📁 Analytics: Auto-save every 5 min / 10 questions`);
@@ -1328,7 +1398,7 @@ app.listen(PORT, () => {
     console.log(`   • Fallback to reception for uncertain cases`);
     console.log(`\n✅ Live Data in Chat:`);
     console.log(`   • Bus times: Fetched from VAO/HAFAS API when asked`);
-    console.log(`   • Weather: Fetched from Open-Meteo API when asked`);
+    console.log(`   • Weather: Fetched from MET Norway API when asked (cached 30min)`);
     console.log(`   • Hardcoded answers: Check-in, WiFi, Breakfast, etc.`);
     console.log(`\n✅ Token savings implemented:`);
     console.log(`   • Hardcoded common questions (100% savings)`);
