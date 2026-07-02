@@ -1,5 +1,5 @@
 {
-  "q": 20,
+  "q": 22,
   "tk": 32603,
   "pt": 31628,
   "ct": 975,
@@ -19,7 +19,9 @@
     "hallo": 1,
     "nächster  bus in richtung stadtzenztrum": 1,
     "wann fährt nächster bus ab?": 1,
-    "weather today": 1
+    "weather today": 1,
+    "how is weather today": 1,
+    "when is the next bus 21 departing": 1
   },
   "sessions": [
     "::1"
@@ -134,5 +136,5 @@
     }
   ],
   "startTime": 1781606450801,
-  "savedAt": 1782994006382
+  "savedAt": 1783001809802
 }
