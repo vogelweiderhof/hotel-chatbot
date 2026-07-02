@@ -1073,81 +1073,107 @@ app.post('/api/chat', async (req, res) => {
         return res.json({ reply: privacyReply });
     }
     
-    // ========== CHECK FOR WEATHER QUESTIONS ==========
-    const weatherKeywords = [
-        'wetter', 'weather', 'temperatur', 'temperature', 'forecast', 'regen', 'rain',
-        'schnee', 'snow', 'sonne', 'sun', 'wolken', 'cloud', 'wind', 'gust',
-        'wie wird das wetter', 'what\'s the weather', 'wettervorhersage'
-    ];
+   // ========== CHECK FOR WEATHER QUESTIONS ==========
+const weatherKeywords = [
+    'wetter', 'weather', 'temperatur', 'temperature', 'forecast', 'regen', 'rain',
+    'schnee', 'snow', 'sonne', 'sun', 'wolken', 'cloud', 'wind', 'gust',
+    'wie wird das wetter', 'what\'s the weather', 'wettervorhersage'
+];
+
+const isWeatherQuestion = weatherKeywords.some(kw => lower.includes(kw));
+
+if (isWeatherQuestion) {
+    let lang = 'en';
+    if (/[äöüß]/.test(question)) lang = 'de';
+    else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
     
-    const isWeatherQuestion = weatherKeywords.some(kw => lower.includes(kw));
-    
-    if (isWeatherQuestion) {
-        let lang = 'en';
-        if (/[äöüß]/.test(question)) lang = 'de';
-        else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
+    try {
+        // ✅ DIRECT WEATHER FETCH - No external function call
+        console.log('🌤️ Weather: Direct fetch triggered by chat');
         
-        try {
-            // ✅ FIX: Call the function directly (now moved to the top)
-            const weatherData = await getWeatherData();
-            
-            if (!weatherData) {
-                throw new Error('No weather data');
-            }
-            
-            let reply = '';
-            
-            if (lang === 'de') {
-                reply = `🌤️ **Wetter in ${weatherData.city}**\n\n`;
-                reply += `**Aktuell:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
-                reply += `**Wind:** ${weatherData.current.wind} km/h\n\n`;
-                reply += `**3-Tage-Vorhersage:**\n`;
-                for (const day of weatherData.forecast) {
-                    reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
-                }
-            } else if (lang === 'zh') {
-                reply = `🌤️ **${weatherData.city}天气**\n\n`;
-                reply += `**当前:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
-                reply += `**风速:** ${weatherData.current.wind} km/h\n\n`;
-                reply += `**3天预报:**\n`;
-                for (const day of weatherData.forecast) {
-                    reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
-                }
-            } else {
-                reply = `🌤️ **Weather in ${weatherData.city}**\n\n`;
-                reply += `**Current:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
-                reply += `**Wind:** ${weatherData.current.wind} km/h\n\n`;
-                reply += `**3-Day Forecast:**\n`;
-                for (const day of weatherData.forecast) {
-                    reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
-                }
-            }
-            
-            // Track analytics
-            analytics.q++;
-            const norm = question.toLowerCase().substring(0, 100);
-            analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-            checkAndSaveAnalytics();
-            
-            // Store in conversation history
-            let history = conversationMemory.get(ip) || [];
-            history.push({ role: "user", content: question.substring(0, 300) });
-            history.push({ role: "assistant", content: reply.substring(0, 500) });
-            if (history.length > 15) history.splice(0, 3);
-            conversationMemory.set(ip, history);
-            
-            return res.json({ reply });
-            
-        } catch (error) {
-            console.error('Weather API error:', error.message);
-            const fallbackReply = lang === 'de' 
-                ? 'Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.'
-                : lang === 'zh'
-                ? '天气信息暂时不可用。请查看天气应用程序获取预报。'
-                : 'Weather information is currently unavailable. Please check a weather app for the forecast.';
-            return res.json({ reply: fallbackReply });
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
+        const geoResponse = await axios.get(geoUrl, { timeout: 10000 });
+        
+        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
+            throw new Error('Location not found');
         }
+        
+        const location = geoResponse.data.results[0];
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
+        const weatherResponse = await axios.get(weatherUrl, { timeout: 10000 });
+        
+        const current = weatherResponse.data.current_weather;
+        const daily = weatherResponse.data.daily;
+        
+        if (!current) {
+            throw new Error('No current weather data');
+        }
+        
+        const weatherCodes = {
+            0: "Clear", 1: "Clear", 2: "Partly cloudy", 3: "Cloudy",
+            45: "Fog", 51: "Drizzle", 61: "Rain", 63: "Rain", 65: "Heavy rain",
+            71: "Snow", 73: "Snow", 75: "Heavy snow", 95: "Thunder"
+        };
+        
+        let reply = '';
+        
+        if (lang === 'de') {
+            reply = `🌤️ **Wetter in ${location.name}**\n\n`;
+            reply += `**Aktuell:** ${current.temperature}°C, ${weatherCodes[current.weathercode] || "Unbekannt"}\n`;
+            reply += `**Wind:** ${current.windspeed} km/h\n\n`;
+            reply += `**3-Tage-Vorhersage:**\n`;
+            for (let i = 0; i < daily.time.length && i < 3; i++) {
+                const day = new Date(daily.time[i]);
+                const dayName = day.toLocaleDateString('de-DE', { weekday: 'short' });
+                reply += `• ${dayName}: ${daily.temperature_2m_max[i]}°C / ${daily.temperature_2m_min[i]}°C, ${weatherCodes[daily.weather_code[i]] || "Unbekannt"}\n`;
+            }
+        } else if (lang === 'zh') {
+            reply = `🌤️ **${location.name}天气**\n\n`;
+            reply += `**当前:** ${current.temperature}°C, ${weatherCodes[current.weathercode] || "未知"}\n`;
+            reply += `**风速:** ${current.windspeed} km/h\n\n`;
+            reply += `**3天预报:**\n`;
+            for (let i = 0; i < daily.time.length && i < 3; i++) {
+                const day = new Date(daily.time[i]);
+                const dayName = day.toLocaleDateString('zh-CN', { weekday: 'short' });
+                reply += `• ${dayName}: ${daily.temperature_2m_max[i]}°C / ${daily.temperature_2m_min[i]}°C, ${weatherCodes[daily.weather_code[i]] || "未知"}\n`;
+            }
+        } else {
+            reply = `🌤️ **Weather in ${location.name}**\n\n`;
+            reply += `**Current:** ${current.temperature}°C, ${weatherCodes[current.weathercode] || "Unknown"}\n`;
+            reply += `**Wind:** ${current.windspeed} km/h\n\n`;
+            reply += `**3-Day Forecast:**\n`;
+            for (let i = 0; i < daily.time.length && i < 3; i++) {
+                const day = new Date(daily.time[i]);
+                const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
+                reply += `• ${dayName}: ${daily.temperature_2m_max[i]}°C / ${daily.temperature_2m_min[i]}°C, ${weatherCodes[daily.weather_code[i]] || "Unknown"}\n`;
+            }
+        }
+        
+        // Track analytics
+        analytics.q++;
+        const norm = question.toLowerCase().substring(0, 100);
+        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
+        checkAndSaveAnalytics();
+        
+        // Store in conversation history
+        let history = conversationMemory.get(ip) || [];
+        history.push({ role: "user", content: question.substring(0, 300) });
+        history.push({ role: "assistant", content: reply.substring(0, 500) });
+        if (history.length > 15) history.splice(0, 3);
+        conversationMemory.set(ip, history);
+        
+        return res.json({ reply });
+        
+    } catch (error) {
+        console.error('🌤️ Weather error in chat:', error.message);
+        const fallbackReply = lang === 'de' 
+            ? 'Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.'
+            : lang === 'zh'
+            ? '天气信息暂时不可用。请查看天气应用程序获取预报。'
+            : 'Weather information is currently unavailable. Please check a weather app for the forecast.';
+        return res.json({ reply: fallbackReply });
     }
+}
     
     // ========== CHECK FOR BUS SCHEDULE QUESTIONS ==========
     const busKeywords = ['bus 21', 'bus21', 'bus 120', 'bus120', 'bus 121', 'bus121', 'bus 150', 'bus150', 'bus 840', 'bus840', 'bus 151', 'bus151', 'bus 25', 'bus25'];
