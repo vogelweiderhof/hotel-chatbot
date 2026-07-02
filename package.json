@@ -2,7 +2,7 @@
   "name": "hotel-chatbot",
   "version": "1.0.0",
   "type": "module",
-  "description": "Hotel chatbot with ÖBB transport integration",
+  "description": "Hotel chatbot with Mistral AI integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,7 +11,6 @@
     "express": "^4.18.2",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
-    "dotenv": "^16.3.1",
-    "hafas-client": "^6.3.6"
+    "dotenv": "^16.3.1"
   }
 }
