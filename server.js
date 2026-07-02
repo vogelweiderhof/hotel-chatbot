@@ -231,6 +231,59 @@ function convertToLocalTime(utcTimeStr) {
     return localTime;
 }
 
+// ========== WEATHER DATA FUNCTION ==========
+// ✅ MOVED HERE - BEFORE the chat endpoint so it's accessible
+async function getWeatherData() {
+    try {
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
+        const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
+        
+        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
+            console.log('🌤️ Weather: Location not found');
+            return null;
+        }
+        
+        const location = geoResponse.data.results[0];
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
+        const weatherResponse = await axios.get(weatherUrl, { timeout: 8000 });
+        
+        const current = weatherResponse.data.current_weather;
+        const daily = weatherResponse.data.daily;
+        
+        if (!current) {
+            console.log('🌤️ Weather: No current weather data');
+            return null;
+        }
+        
+        const weatherCodes = {
+            0: "Clear", 1: "Clear", 2: "Partly cloudy", 3: "Cloudy",
+            45: "Fog", 51: "Drizzle", 61: "Rain", 63: "Rain", 65: "Heavy rain",
+            71: "Snow", 73: "Snow", 75: "Heavy snow", 95: "Thunder"
+        };
+        
+        const weatherData = {
+            city: location.name,
+            current: {
+                temp: current.temperature,
+                condition: weatherCodes[current.weathercode] || "Unknown",
+                wind: current.windspeed
+            },
+            forecast: daily.time.slice(0, 3).map((time, i) => ({
+                day: new Date(time).toLocaleDateString('en-US', { weekday: 'short' }),
+                high: daily.temperature_2m_max[i],
+                low: daily.temperature_2m_min[i],
+                condition: weatherCodes[daily.weather_code[i]] || "Unknown"
+            }))
+        };
+        
+        console.log('🌤️ Weather data fetched successfully');
+        return weatherData;
+    } catch (error) {
+        console.error('🌤️ Weather API error:', error.message);
+        return null;
+    }
+}
+
 // ========== BUS SCHEDULE HELPER FUNCTIONS ==========
 
 async function getBusSchedule(busNumber, direction = 'citycenter') {
@@ -241,7 +294,6 @@ async function getBusSchedule(busNumber, direction = 'citycenter') {
         return null;
     }
     
-    // Filter by direction if specified
     let filteredDepartures = departures;
     if (direction === 'citycenter') {
         filteredDepartures = departures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn'));
@@ -257,10 +309,8 @@ async function getBusSchedule(busNumber, direction = 'citycenter') {
         return null;
     }
     
-    // Sort by time
     filteredDepartures.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
     
-    // Convert to local time
     const localTimes = filteredDepartures.slice(0, 5).map(b => ({
         time: convertToLocalTime(b.departureTime),
         delay: b.delay
@@ -371,51 +421,6 @@ app.get('/api/bus-times', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch bus times' });
     }
 });
-
-// ========== WEATHER DATA FUNCTION ==========
-async function getWeatherData() {
-    try {
-        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=Salzburg&count=1&language=en&format=json`;
-        const geoResponse = await axios.get(geoUrl, { timeout: 8000 });
-        
-        if (!geoResponse.data.results || geoResponse.data.results.length === 0) {
-            return null;
-        }
-        
-        const location = geoResponse.data.results[0];
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current_weather=true&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Vienna&forecast_days=3`;
-        const weatherResponse = await axios.get(weatherUrl, { timeout: 8000 });
-        
-        const current = weatherResponse.data.current_weather;
-        const daily = weatherResponse.data.daily;
-        
-        if (!current) return null;
-        
-        const weatherCodes = {
-            0: "Clear", 1: "Clear", 2: "Partly cloudy", 3: "Cloudy",
-            45: "Fog", 51: "Drizzle", 61: "Rain", 63: "Rain", 65: "Heavy rain",
-            71: "Snow", 73: "Snow", 75: "Heavy snow", 95: "Thunder"
-        };
-        
-        return {
-            city: location.name,
-            current: {
-                temp: current.temperature,
-                condition: weatherCodes[current.weathercode] || "Unknown",
-                wind: current.windspeed
-            },
-            forecast: daily.time.slice(0, 3).map((time, i) => ({
-                day: new Date(time).toLocaleDateString('en-US', { weekday: 'short' }),
-                high: daily.temperature_2m_max[i],
-                low: daily.temperature_2m_min[i],
-                condition: weatherCodes[daily.weather_code[i]] || "Unknown"
-            }))
-        };
-    } catch (error) {
-        console.log('Weather API error:', error.message);
-        return null;
-    }
-}
 
 // ========== WEATHER API ENDPOINT ==========
 let weatherCache = {
@@ -1083,7 +1088,7 @@ app.post('/api/chat', async (req, res) => {
         else if (/[\u4e00-\u9fff]/.test(question)) lang = 'zh';
         
         try {
-            // ✅ FIX: Call the function directly instead of making an HTTP request
+            // ✅ FIX: Call the function directly (now moved to the top)
             const weatherData = await getWeatherData();
             
             if (!weatherData) {
@@ -1170,7 +1175,6 @@ app.post('/api/chat', async (req, res) => {
         else if (lower.includes('151')) busNumber = '151';
         else if (lower.includes('25')) busNumber = '25';
         else {
-            // Default to Bus 21
             busNumber = '21';
         }
         
