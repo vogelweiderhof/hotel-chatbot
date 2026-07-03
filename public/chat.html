@@ -38,6 +38,8 @@
             flex-direction: column;
             align-items: center;
             gap: 5px;
+            position: relative;
+            z-index: 10;
         }
         
         .hotel-logo {
@@ -165,19 +167,23 @@
             font-style: italic;
         }
         
-        /* Floating Overlay - Top Left */
+        /* ========== MOVABLE OVERLAY ========== */
         .bus-overlay {
             position: fixed;
-            top: 15px;
-            left: 15px;
             width: 260px;
             background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-            z-index: 1000;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.15);
+            z-index: 9999;
             overflow: hidden;
             border: 1px solid #E8DCC8;
             font-size: 12px;
+            top: 20px;
+            right: 20px;
+            left: auto;
+            transition: none;
+            touch-action: none;
+            user-select: none;
         }
         
         .bus-overlay-header {
@@ -189,27 +195,65 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: pointer;
+            cursor: grab;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .bus-overlay-header:active {
+            cursor: grabbing;
+        }
+        
+        .bus-overlay-header .title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         
         .bus-overlay-header .toggle-btn {
             background: none;
             border: none;
             color: white;
-            font-size: 13px;
+            font-size: 14px;
             cursor: pointer;
             padding: 0 4px;
         }
         
         .bus-overlay-content {
             padding: 8px 10px;
-            max-height: 400px;
+            max-height: 380px;
             overflow-y: auto;
             display: block;
         }
-        .bus-overlay-content.collapsed { display: none; }
         
-        /* Weather Section */
+        .bus-overlay-content.collapsed {
+            display: none;
+        }
+        
+        .bus-overlay.minimized {
+            width: auto !important;
+            min-width: 100px;
+            max-width: 160px;
+            border-radius: 20px;
+        }
+        
+        .bus-overlay.minimized .bus-overlay-header {
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 10px;
+        }
+        
+        .bus-overlay.minimized .bus-overlay-header .title {
+            font-size: 11px;
+        }
+        
+        .bus-overlay.minimized .bus-overlay-header .toggle-btn {
+            font-size: 12px;
+        }
+        
+        .bus-overlay.minimized .bus-overlay-content {
+            display: none !important;
+        }
+        
         .weather-section {
             background: #f8f5f0;
             border-radius: 8px;
@@ -233,9 +277,7 @@
             font-size: 9px;
             color: #555;
         }
-        .weather-forecast .day {
-            text-align: center;
-        }
+        .weather-forecast .day { text-align: center; }
         .weather-forecast .day .high { color: #D4A373; font-weight: bold; }
         .weather-forecast .day .low { color: #888; }
         
@@ -250,7 +292,6 @@
             color: #3A5E3C;
         }
         
-        /* Horizontal times (Bus 21) */
         .bus-times-horizontal {
             display: flex;
             gap: 12px;
@@ -272,7 +313,6 @@
             font-size: 10px;
         }
         
-        /* Vertical times (Bus 120/121) */
         .bus-times-vertical {
             display: flex;
             flex-direction: column;
@@ -330,15 +370,25 @@
         }
         .error-bus { color: #e74c3c; }
         
+        .drag-hint {
+            font-size: 8px;
+            color: rgba(255,255,255,0.5);
+            margin-left: 6px;
+        }
+        
         @media (max-width: 600px) {
             body { padding: 0; }
             .chat-container { height: 100vh; border-radius: 0; }
-            .bus-overlay { width: 220px; top: 10px; left: 10px; }
-            .bus-overlay-header { font-size: 10px; padding: 5px 8px; }
-            .weather-section .temp { font-size: 16px; }
-            .weather-forecast { font-size: 8px; }
-            .bus-times-horizontal .time-item { font-size: 12px; }
-            .bus-times-vertical .time-item { font-size: 12px; }
+            .bus-overlay { 
+                width: 220px;
+                top: 10px;
+                right: 10px;
+                left: auto;
+            }
+            .bus-overlay.minimized {
+                min-width: 80px;
+                max-width: 130px;
+            }
         }
     </style>
 </head>
@@ -366,7 +416,7 @@ I'm your AI assistant. I can help with:
 • Restaurants, weather & directions
 • And more!
 
-🌍 Just ask in your language!</div>
+🌍 I speak English, Deutsch, 中文, Español, Français, Italiano!</div>
                 <div class="quick-replies">
                     <span class="quick-chip" onclick="sendSuggested('Check-in time?')">📅 Check-in</span>
                     <span class="quick-chip" onclick="sendSuggested('WiFi password?')">📶 WiFi</span>
@@ -383,11 +433,14 @@ I'm your AI assistant. I can help with:
         <div id="typing" class="typing" style="display: none;">🤖 Thinking...</div>
     </div>
     
-    <!-- Floating Overlay -->
+    <!-- MOVABLE OVERLAY -->
     <div class="bus-overlay" id="busOverlay">
-        <div class="bus-overlay-header" onclick="toggleOverlay()">
-            <span>🚌 Live Times from Baron Schwarz Park</span>
-            <button class="toggle-btn" id="toggleBtn">−</button>
+        <div class="bus-overlay-header" id="overlayHeader">
+            <span class="title">
+                🚌 <span id="overlayTitle">Live Times</span>
+                <span class="drag-hint">↕</span>
+            </span>
+            <button class="toggle-btn" id="toggleBtn" onclick="toggleOverlay()">−</button>
         </div>
         <div class="bus-overlay-content" id="overlayContent">
             <div id="weatherDisplay">
@@ -405,6 +458,101 @@ I'm your AI assistant. I can help with:
         let overlayInterval = null;
         let weatherData = null;
         let busData = null;
+        let isMinimized = false;
+        
+        // ========== OVERLAY DRAG FUNCTIONALITY ==========
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        
+        const overlay = document.getElementById('busOverlay');
+        const header = document.getElementById('overlayHeader');
+        
+        function startDrag(e) {
+            if (e.target.closest('.toggle-btn')) return;
+            
+            isDragging = true;
+            const rect = overlay.getBoundingClientRect();
+            
+            if (e.type === 'mousedown') {
+                dragOffsetX = e.clientX - rect.left;
+                dragOffsetY = e.clientY - rect.top;
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', stopDrag);
+            } else if (e.type === 'touchstart') {
+                const touch = e.touches[0];
+                dragOffsetX = touch.clientX - rect.left;
+                dragOffsetY = touch.clientY - rect.top;
+                document.addEventListener('touchmove', onDragTouch);
+                document.addEventListener('touchend', stopDragTouch);
+            }
+            
+            e.preventDefault();
+        }
+        
+        function onDrag(e) {
+            if (!isDragging) return;
+            const x = e.clientX - dragOffsetX;
+            const y = e.clientY - dragOffsetY;
+            moveOverlay(x, y);
+        }
+        
+        function onDragTouch(e) {
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            const x = touch.clientX - dragOffsetX;
+            const y = touch.clientY - dragOffsetY;
+            moveOverlay(x, y);
+        }
+        
+        function moveOverlay(x, y) {
+            const rect = overlay.getBoundingClientRect();
+            const maxX = window.innerWidth - rect.width;
+            const maxY = window.innerHeight - rect.height;
+            
+            x = Math.max(0, Math.min(x, maxX));
+            y = Math.max(0, Math.min(y, maxY));
+            
+            overlay.style.left = x + 'px';
+            overlay.style.top = y + 'px';
+            overlay.style.right = 'auto';
+        }
+        
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+        
+        function stopDragTouch() {
+            isDragging = false;
+            document.removeEventListener('touchmove', onDragTouch);
+            document.removeEventListener('touchend', stopDragTouch);
+        }
+        
+        header.addEventListener('mousedown', startDrag);
+        header.addEventListener('touchstart', startDrag, { passive: false });
+        
+        // ========== OVERLAY MINIMIZE ==========
+        function toggleOverlay() {
+            const content = document.getElementById('overlayContent');
+            const btn = document.getElementById('toggleBtn');
+            
+            if (isMinimized) {
+                overlay.classList.remove('minimized');
+                content.classList.remove('collapsed');
+                btn.textContent = '−';
+                document.getElementById('overlayTitle').textContent = 'Live Times';
+                isMinimized = false;
+                fetchAllData();
+            } else {
+                overlay.classList.add('minimized');
+                content.classList.add('collapsed');
+                btn.textContent = '+';
+                document.getElementById('overlayTitle').textContent = '🚌 ☀️';
+                isMinimized = true;
+            }
+        }
         
         // ========== CHAT FUNCTIONS ==========
         async function sendMessage() {
@@ -447,20 +595,7 @@ I'm your AI assistant. I can help with:
             div.scrollTop = div.scrollHeight;
         }
         
-        // ========== OVERLAY FUNCTIONS ==========
-        
-        function toggleOverlay() {
-            const content = document.getElementById('overlayContent');
-            const btn = document.getElementById('toggleBtn');
-            if (content.classList.contains('collapsed')) {
-                content.classList.remove('collapsed');
-                btn.textContent = '−';
-                fetchAllData();
-            } else {
-                content.classList.add('collapsed');
-                btn.textContent = '+';
-            }
-        }
+        // ========== OVERLAY DATA FUNCTIONS ==========
         
         async function fetchWeather() {
             try {
@@ -518,7 +653,6 @@ I'm your AI assistant. I can help with:
             }
             let html = '';
             
-            // Bus 21 → City Center (Fürstenbrunn) - HORIZONTAL, 3 times
             html += `<div class="bus-line"><h4>🚌 Bus 21 → City Center (Fürstenbrunn)</h4>`;
             html += `<div class="bus-times-horizontal">`;
             const b21 = data.bus21?.times || [];
@@ -535,10 +669,8 @@ I'm your AI assistant. I can help with:
             }
             html += `</div></div>`;
             
-            // Bus 120/121 → Train Station (Hauptbahnhof) - VERTICAL with labels, 3 times
             html += `<div class="bus-line"><h4>🚌 Bus 120/121 → Train Station (Hauptbahnhof)</h4>`;
             html += `<div class="bus-times-vertical">`;
-            
             const b120 = data.bus120?.times || [];
             if (b120.length > 0) {
                 const nextThree = b120.slice(0, 3);
@@ -561,29 +693,40 @@ I'm your AI assistant. I can help with:
         async function fetchAllData() {
             const weatherDiv = document.getElementById('weatherDisplay');
             const busDiv = document.getElementById('busDisplay');
-            weatherDiv.innerHTML = '<div class="loading-bus">Loading weather...</div>';
-            busDiv.innerHTML = '<div class="loading-bus">Loading bus times...</div>';
+            
+            if (!isMinimized) {
+                weatherDiv.innerHTML = '<div class="loading-bus">Loading weather...</div>';
+                busDiv.innerHTML = '<div class="loading-bus">Loading bus times...</div>';
+            }
             
             const [w, b] = await Promise.all([fetchWeather(), fetchBusTimes()]);
             
-            if (w) renderWeather(w);
-            else weatherDiv.innerHTML = '<div class="error-bus">Weather unavailable</div>';
-            
-            if (b) renderBus(b);
-            else busDiv.innerHTML = '<div class="error-bus">Bus data unavailable</div>';
-            
-            document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            if (!isMinimized) {
+                if (w) renderWeather(w);
+                else weatherDiv.innerHTML = '<div class="error-bus">Weather unavailable</div>';
+                
+                if (b) renderBus(b);
+                else busDiv.innerHTML = '<div class="error-bus">Bus data unavailable</div>';
+                
+                document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            }
         }
         
         function initOverlay() {
+            overlay.style.top = '20px';
+            overlay.style.right = '20px';
+            overlay.style.left = 'auto';
+            
             fetchAllData();
             if (overlayInterval) clearInterval(overlayInterval);
             overlayInterval = setInterval(() => {
-                fetchBusTimes().then(b => { if (b) renderBus(b); });
-                if (!weatherData || Date.now() - weatherData._fetched > 600000) {
-                    fetchWeather().then(w => { if (w) renderWeather(w); });
+                if (!isMinimized) {
+                    fetchBusTimes().then(b => { if (b) renderBus(b); });
+                    if (!weatherData || Date.now() - weatherData._fetched > 600000) {
+                        fetchWeather().then(w => { if (w) renderWeather(w); });
+                    }
+                    document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
                 }
-                document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
             }, 60000);
         }
         
