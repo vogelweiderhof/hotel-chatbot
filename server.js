@@ -231,19 +231,64 @@ function convertToLocalTime(utcTimeStr) {
     return localTime;
 }
 
-// ========== WEATHER DATA FUNCTION (MET NORWAY - FIXED) ==========
-// MET Norway API - Free for commercial use, no API key required
-// Requires User-Agent with email for identification
-// Rate limit: 20 requests/second (very generous)
-// Source: https://api.met.no/weatherapi/locationforecast/2.0/documentation
+// ========== WEATHER DATA FUNCTION (WEATHERAPI.COM) ==========
+// Free tier: 100,000 calls/month, commercial use allowed
+// Sign up at: https://www.weatherapi.com/signup.aspx
+// MET Norway used as fallback if no API key
 
 async function getWeatherData() {
+    const apiKey = process.env.WEATHERAPI_KEY;
+    
+    // If no API key, fall back to MET Norway
+    if (!apiKey) {
+        console.log('🌤️ Weather: No WeatherAPI key, falling back to MET Norway');
+        return getWeatherDataMET();
+    }
+    
+    const url = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=Salzburg&days=3&aqi=no&alerts=no`;
+
+    try {
+        console.log('🌤️ Weather: Fetching from WeatherAPI.com...');
+        const response = await axios.get(url, { timeout: 10000 });
+
+        if (!response.data || !response.data.forecast) {
+            console.log('🌤️ Weather: Invalid response from WeatherAPI');
+            return null;
+        }
+
+        const forecastDays = response.data.forecast.forecastday;
+
+        return {
+            city: response.data.location.name,
+            current: {
+                temp: Math.round(response.data.current.temp_c),
+                condition: response.data.current.condition.text,
+                wind: Math.round(response.data.current.wind_kph)
+            },
+            forecast: forecastDays.map(day => ({
+                day: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
+                high: Math.round(day.day.maxtemp_c),
+                low: Math.round(day.day.mintemp_c),
+                condition: day.day.condition.text
+            }))
+        };
+
+    } catch (error) {
+        console.error('🌤️ WeatherAPI.com error:', error.message);
+        // Fallback to MET Norway
+        console.log('🌤️ Weather: Falling back to MET Norway');
+        return getWeatherDataMET();
+    }
+}
+
+// ========== WEATHER DATA FUNCTION (MET NORWAY - FALLBACK) ==========
+async function getWeatherDataMET() {
     const lat = 47.80949;  // Salzburg latitude
     const lon = 13.05501;  // Salzburg longitude
     const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
 
     try {
-        console.log('🌤️ Weather: Fetching from MET Norway...');
+        console.log('🌤️ Weather: Fetching from MET Norway (fallback)...');
         
         const response = await axios.get(url, {
             headers: {
@@ -253,83 +298,52 @@ async function getWeatherData() {
         });
 
         if (!response.data || !response.data.properties || !response.data.properties.timeseries) {
-            console.log('🌤️ Weather: Invalid response from MET Norway');
             return null;
         }
 
         const timeseries = response.data.properties.timeseries;
-        if (timeseries.length === 0) {
-            console.log('🌤️ Weather: No timeseries data');
-            return null;
-        }
+        if (timeseries.length === 0) return null;
 
-        // ========== CURRENT WEATHER ==========
+        // Current weather
         const currentData = timeseries[0].data.instant.details;
         let currentCondition = 'Unknown';
-        
-        // Try to get condition from symbol_code
         if (currentData.symbol_code) {
             currentCondition = getConditionFromSymbol(currentData.symbol_code);
-        } else if (currentData.cloud_area_fraction !== undefined) {
-            const cloud = currentData.cloud_area_fraction;
-            if (cloud < 20) currentCondition = 'Clear';
-            else if (cloud < 50) currentCondition = 'Partly cloudy';
-            else if (cloud < 80) currentCondition = 'Cloudy';
-            else currentCondition = 'Overcast';
         }
 
-        // ========== FORECAST (Next 3 days) ==========
-        // Group forecast by day
+        // Forecast - group by day
         const dailyForecasts = {};
-        
-        for (let i = 1; i < Math.min(timeseries.length, 12); i++) {
+        for (let i = 1; i < Math.min(timeseries.length, 24); i++) {
             const item = timeseries[i];
             const date = new Date(item.time);
-            const dayKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+            const dayKey = date.toISOString().split('T')[0];
             
-            // Get temperature for this time slot
             let temp = null;
             let condition = 'Unknown';
             
-            // Try to get temperature from next_1_hours or instant
             if (item.data.next_1_hours && item.data.next_1_hours.details) {
                 const details = item.data.next_1_hours.details;
                 temp = details.air_temperature;
-                if (details.symbol_code) {
-                    condition = getConditionFromSymbol(details.symbol_code);
-                }
+                if (details.symbol_code) condition = getConditionFromSymbol(details.symbol_code);
             } else if (item.data.instant && item.data.instant.details) {
                 const details = item.data.instant.details;
                 temp = details.air_temperature;
-                if (details.symbol_code) {
-                    condition = getConditionFromSymbol(details.symbol_code);
-                }
+                if (details.symbol_code) condition = getConditionFromSymbol(details.symbol_code);
             }
             
             if (temp !== null) {
                 if (!dailyForecasts[dayKey]) {
-                    dailyForecasts[dayKey] = {
-                        temps: [],
-                        conditions: [],
-                        date: date
-                    };
+                    dailyForecasts[dayKey] = { temps: [], conditions: [], date: date };
                 }
                 dailyForecasts[dayKey].temps.push(temp);
-                if (condition !== 'Unknown') {
-                    dailyForecasts[dayKey].conditions.push(condition);
-                }
+                if (condition !== 'Unknown') dailyForecasts[dayKey].conditions.push(condition);
             }
         }
         
-        // Build forecast array (max 3 days)
         const forecast = [];
         const dayKeys = Object.keys(dailyForecasts).slice(0, 3);
-        
         for (const key of dayKeys) {
             const dayData = dailyForecasts[key];
-            const temps = dayData.temps;
-            
-            // Get most common condition
             let condition = 'Unknown';
             if (dayData.conditions.length > 0) {
                 const conditionCounts = {};
@@ -338,22 +352,17 @@ async function getWeatherData() {
                 }
                 let maxCount = 0;
                 for (const [c, count] of Object.entries(conditionCounts)) {
-                    if (count > maxCount) {
-                        maxCount = count;
-                        condition = c;
-                    }
+                    if (count > maxCount) { maxCount = count; condition = c; }
                 }
             }
-            
             forecast.push({
                 day: dayData.date.toLocaleDateString('en-US', { weekday: 'short' }),
-                high: Math.round(Math.max(...temps)),
-                low: Math.round(Math.min(...temps)),
+                high: Math.round(Math.max(...dayData.temps)),
+                low: Math.round(Math.min(...dayData.temps)),
                 condition: condition
             });
         }
 
-        // If we have fewer than 3 forecast days, fill with placeholder
         while (forecast.length < 3) {
             const futureDate = new Date();
             futureDate.setDate(futureDate.getDate() + forecast.length + 1);
@@ -376,41 +385,24 @@ async function getWeatherData() {
         };
 
     } catch (error) {
-        console.error('🌤️ MET Norway Weather API error:', error.message);
-        if (error.response) {
-            console.error('🌤️ MET Norway Response status:', error.response.status);
-        }
+        console.error('🌤️ MET Norway fallback error:', error.message);
         return null;
     }
 }
 
-// ========== HELPER: Map MET Norway symbol codes to readable conditions ==========
 function getConditionFromSymbol(symbolCode) {
     if (!symbolCode) return 'Unknown';
-    
-    // Remove suffixes like '_day', '_night', '_polartwilight'
     const cleanCode = symbolCode.split('_')[0];
-    
     const conditions = {
-        'clearsky': 'Clear',
-        'fair': 'Fair',
-        'partlycloudy': 'Partly cloudy',
-        'cloudy': 'Cloudy',
-        'rain': 'Rain',
-        'heavyrain': 'Heavy rain',
-        'rainshowers': 'Rain showers',
-        'heavyrainshowers': 'Heavy rain showers',
-        'snow': 'Snow',
-        'heavysnow': 'Heavy snow',
-        'snowshowers': 'Snow showers',
-        'heavyrainandrain': 'Rain',
-        'fog': 'Fog',
-        'thunder': 'Thunderstorm',
-        'sleet': 'Sleet'
+        'clearsky': 'Clear', 'fair': 'Fair', 'partlycloudy': 'Partly cloudy',
+        'cloudy': 'Cloudy', 'rain': 'Rain', 'heavyrain': 'Heavy rain',
+        'rainshowers': 'Rain showers', 'heavyrainshowers': 'Heavy rain showers',
+        'snow': 'Snow', 'heavysnow': 'Heavy snow', 'snowshowers': 'Snow showers',
+        'fog': 'Fog', 'thunder': 'Thunderstorm', 'sleet': 'Sleet'
     };
-    
     return conditions[cleanCode] || cleanCode || 'Unknown';
 }
+
 // ========== BUS SCHEDULE HELPER FUNCTIONS ==========
 
 async function getBusSchedule(busNumber, direction = 'citycenter') {
@@ -550,8 +542,8 @@ app.get('/api/bus-times', async (req, res) => {
 });
 
 // ========== WEATHER API ENDPOINT ==========
-// ✅ Using MET Norway - Free for commercial use, no API key required
-// Cached for 30 minutes to reduce unnecessary calls
+// ✅ Using WeatherAPI.com (primary) with MET Norway as fallback
+// Cached for 30 minutes to reduce API calls
 let weatherCache = {
     data: null,
     timestamp: null,
@@ -567,7 +559,7 @@ app.get('/api/weather', async (req, res) => {
         return res.json(weatherCache.data);
     }
     
-    console.log('🌤️ Weather: Cache expired, fetching fresh data from MET Norway...');
+    console.log('🌤️ Weather: Cache expired, fetching fresh data...');
     const weatherData = await getWeatherData();
     
     if (weatherData) {
@@ -579,7 +571,7 @@ app.get('/api/weather', async (req, res) => {
         console.log('🌤️ Weather: Fresh data cached for 30 minutes');
         res.json(weatherData);
     } else {
-        console.error('🌤️ Weather: Failed to fetch data from MET Norway');
+        console.error('🌤️ Weather: Failed to fetch data');
         res.status(500).json({ error: 'Failed to fetch weather' });
     }
 });
@@ -1443,8 +1435,8 @@ app.listen(PORT, () => {
     console.log(`🤖 AI: Mistral Small 2501 (EU-hosted, GDPR-compliant)`);
     console.log(`💰 Pricing: Input $0.10/1M | Output $0.30/1M tokens`);
     console.log(`🔑 API Key: ${process.env.MISTRAL_API_KEY ? '✅ Loaded' : '❌ MISSING'}`);
+    console.log(`🌤️ Weather API: WeatherAPI.com (primary) + MET Norway (fallback), cached 30min`);
     console.log(`🚆 Bus API: ENABLED (cached 60s, with timezone fix)`);
-    console.log(`🌤️ Weather API: ENABLED (MET Norway - free for commercial use, cached 30min)`);
     console.log(`📊 Hardcoded responses: ENABLED (check-in, wifi, breakfast, etc.)`);
     console.log(`💾 Conversation: last 4 messages only (reduced tokens)`);
     console.log(`📁 Analytics: Auto-save every 5 min / 10 questions`);
@@ -1459,7 +1451,7 @@ app.listen(PORT, () => {
     console.log(`   • Fallback to reception for uncertain cases`);
     console.log(`\n✅ Live Data in Chat:`);
     console.log(`   • Bus times: Fetched from VAO/HAFAS API when asked`);
-    console.log(`   • Weather: Fetched from MET Norway API when asked (cached 30min)`);
+    console.log(`   • Weather: WeatherAPI.com with MET Norway fallback (cached 30min)`);
     console.log(`   • Hardcoded answers: Check-in, WiFi, Breakfast, etc.`);
     console.log(`\n✅ Token savings implemented:`);
     console.log(`   • Hardcoded common questions (100% savings)`);
