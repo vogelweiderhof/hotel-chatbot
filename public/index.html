@@ -340,9 +340,18 @@
     </div>
     
     <script>
-        // ========== AUTHENTICATION CHECK ==========
+        // ========== AUTHENTICATION ==========
+        function getAuthToken() {
+            return localStorage.getItem('adminToken');
+        }
+        
+        function getAuthHeaders() {
+            const token = getAuthToken();
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+        
         async function checkAdminAuth() {
-            const token = localStorage.getItem('adminToken');
+            const token = getAuthToken();
             if (!token) {
                 window.location.href = '/login.html';
                 return false;
@@ -390,7 +399,9 @@
         // ========== LIMITS ==========
         async function loadLimits() {
             try {
-                const res = await fetch('/api/limits');
+                const res = await fetch('/api/limits', {
+                    headers: getAuthHeaders()
+                });
                 const limits = await res.json();
                 document.getElementById('maxTokens').value = limits.maxTokens || 450;
                 document.getElementById('maxSession').value = limits.maxSession || 20;
@@ -410,7 +421,7 @@
             try {
                 const res = await fetch('/api/limits', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
                     body: JSON.stringify(limits)
                 });
                 const data = await res.json();
@@ -473,7 +484,9 @@
         // ========== ANALYTICS ==========
         async function refreshAnalytics() {
             try {
-                const res = await fetch('/api/analytics');
+                const res = await fetch('/api/analytics', {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 const token = data.token || {};
                 
@@ -494,7 +507,9 @@
         
         async function refreshTokenAnalytics() {
             try {
-                const res = await fetch('/api/analytics');
+                const res = await fetch('/api/analytics', {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 const token = data.token || {};
                 
@@ -519,7 +534,9 @@
         // ========== BACKUP BROWSER ==========
         async function refreshBackupList() {
             try {
-                const res = await fetch('/api/backups');
+                const res = await fetch('/api/backups', {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 const select = document.getElementById('backupSelect');
                 
@@ -565,7 +582,9 @@
             status.innerHTML = '<div class="info-bg">⏳ Loading backup...</div>';
             
             try {
-                const res = await fetch(`/api/backup/${filename}`);
+                const res = await fetch(`/api/backup/${filename}`, {
+                    headers: getAuthHeaders()
+                });
                 const data = await res.json();
                 
                 if (data.error) {
@@ -622,7 +641,8 @@
             
             try {
                 const res = await fetch(`/api/backup/${filename}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
                 });
                 const data = await res.json();
                 
@@ -652,7 +672,7 @@
             try {
                 const res = await fetch('/api/restore-backup', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
                     body: JSON.stringify({ filename: filename })
                 });
                 const data = await res.json();
@@ -672,8 +692,23 @@
             }
         }
         
+        // ========== LOGOUT ==========
+        async function logout() {
+            const token = getAuthToken();
+            if (token) {
+                try {
+                    await fetch('/api/admin/logout', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch(e) {}
+            }
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminUsername');
+            window.location.href = '/login.html';
+        }
+        
         // ========== INIT ==========
-        // Check authentication before loading anything
         document.addEventListener('DOMContentLoaded', async function() {
             const auth = await checkAdminAuth();
             if (!auth) return;
