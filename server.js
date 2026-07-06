@@ -26,17 +26,10 @@ const ANALYTICS_FILE = path.join(__dirname, 'analytics.json');
 const ANALYTICS_BACKUP = path.join(__dirname, 'analytics.json.bak');
 
 // ========== USER LANGUAGE STORAGE ==========
-const userLanguage = new Map(); // { "ip": "en" }
-const conversationTopic = new Map(); // { "ip": "weather" }
-const conversationMemory = new Map(); // { "ip": [ { role, content } ] }
+const userLanguage = new Map();
+const conversationMemory = new Map();
 
 // ========== HELPER FUNCTIONS ==========
-function isWeekendOrHoliday() {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    return (dayOfWeek === 0 || dayOfWeek === 6);
-}
-
 function getTodayStr() {
     return new Date().toISOString().split('T')[0];
 }
@@ -90,41 +83,17 @@ function getLanguageSwitchConfirmation(lang) {
 // ========== GET FALLBACK RESPONSE ==========
 function getFallbackResponse(lang, category = 'general') {
     const fallbacks = {
-        en: {
-            weather: "Weather information is currently unavailable. Please check a weather app for the forecast.",
-            bus: "Bus schedule information is currently unavailable. Please check www.oebb.at for current schedules.",
-            general: "I'm having technical difficulties. Please try again later."
-        },
-        de: {
-            weather: "Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.",
-            bus: "Fahrplaninformationen sind gerade nicht verfügbar. Bitte prüfen Sie www.oebb.at für aktuelle Fahrpläne.",
-            general: "Ich habe gerade technische Probleme. Bitte versuchen Sie es später noch einmal."
-        },
-        zh: {
-            weather: "天气信息暂时不可用。请查看天气应用程序获取预报。",
-            bus: "巴士时刻表信息暂时不可用。请查看www.oebb.at获取当前时刻表。",
-            general: "我遇到了一些技术问题。请稍后再试。"
-        },
-        es: {
-            weather: "La información del tiempo no está disponible actualmente. Consulte una aplicación meteorológica para el pronóstico.",
-            bus: "La información de horarios de autobuses no está disponible actualmente. Consulte www.oebb.at para horarios actuales.",
-            general: "Estoy teniendo dificultades técnicas. Por favor, inténtelo de nuevo más tarde."
-        },
-        fr: {
-            weather: "Les informations météo ne sont pas disponibles actuellement. Veuillez consulter une application météo pour les prévisions.",
-            bus: "Les horaires de bus ne sont pas disponibles actuellement. Veuillez consulter www.oebb.at pour les horaires actuels.",
-            general: "Je rencontre des difficultés techniques. Veuillez réessayer plus tard."
-        },
-        it: {
-            weather: "Le informazioni meteo non sono al momento disponibili. Si prega di controllare un'app meteo per le previsioni.",
-            bus: "Le informazioni sugli orari degli autobus non sono al momento disponibili. Si prega di controllare www.oebb.at per gli orari correnti.",
-            general: "Sto avendo difficoltà tecniche. Per favore riprova più tardi."
-        }
+        en: { weather: "Weather information is currently unavailable. Please check a weather app for the forecast.", bus: "Bus schedule information is currently unavailable. Please check www.oebb.at for current schedules.", general: "I'm having technical difficulties. Please try again later." },
+        de: { weather: "Wetterinformationen sind gerade nicht verfügbar. Bitte besuchen Sie www.wetter.at für die aktuelle Vorhersage.", bus: "Fahrplaninformationen sind gerade nicht verfügbar. Bitte prüfen Sie www.oebb.at für aktuelle Fahrpläne.", general: "Ich habe gerade technische Probleme. Bitte versuchen Sie es später noch einmal." },
+        zh: { weather: "天气信息暂时不可用。请查看天气应用程序获取预报。", bus: "巴士时刻表信息暂时不可用。请查看www.oebb.at获取当前时刻表。", general: "我遇到了一些技术问题。请稍后再试。" },
+        es: { weather: "La información del tiempo no está disponible actualmente. Consulte una aplicación meteorológica para el pronóstico.", bus: "La información de horarios de autobuses no está disponible actualmente. Consulte www.oebb.at para horarios actuales.", general: "Estoy teniendo dificultades técnicas. Por favor, inténtelo de nuevo más tarde." },
+        fr: { weather: "Les informations météo ne sont pas disponibles actuellement. Veuillez consulter une application météo pour les prévisions.", bus: "Les horaires de bus ne sont pas disponibles actuellement. Veuillez consulter www.oebb.at pour les horaires actuels.", general: "Je rencontre des difficultés techniques. Veuillez réessayer plus tard." },
+        it: { weather: "Le informazioni meteo non sono al momento disponibili. Si prega di controllare un'app meteo per le previsioni.", bus: "Le informazioni sugli orari degli autobus non sono al momento disponibili. Si prega di controllare www.oebb.at per gli orari correnti.", general: "Sto avendo difficoltà tecniche. Per favore riprova più tardi." }
     };
     return fallbacks[lang]?.[category] || fallbacks.en.general;
 }
 
-// ========== HARDCODED RESPONSES ==========
+// ========== HARDCODED RESPONSES (For 1-2 word queries ONLY) ==========
 const QUICK_RESPONSES = {
     'check-in': {
         en: "Check-in is from 15:00 to 20:00. Please notify us if arriving after 20:00.",
@@ -196,35 +165,17 @@ let busDataCache = {
 async function findStation(stationName) {
     try {
         const requestBody = {
-            svcReqL: [{
-                req: { input: { loc: { name: stationName }, field: "S" } },
-                meth: "LocMatch",
-                id: "1|1|"
-            }],
+            svcReqL: [{ req: { input: { loc: { name: stationName }, field: "S" } }, meth: "LocMatch", id: "1|1|" }],
             client: { id: "VAO", v: "1", type: "AND", name: "nextgen" },
-            ver: "1.73",
-            lang: "en",
-            auth: { aid: "nextgen", type: "AID" }
+            ver: "1.73", lang: "en", auth: { aid: "nextgen", type: "AID" }
         };
-        
-        const response = await axios.post(VAO_API_URL, requestBody, {
-            timeout: 8000,
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
+        const response = await axios.post(VAO_API_URL, requestBody, { timeout: 8000, headers: { 'Content-Type': 'application/json' } });
         const locations = response.data?.svcResL?.[0]?.res?.match?.locL || [];
         if (locations && locations.length > 0) {
-            return {
-                name: locations[0].name,
-                extId: locations[0].extId,
-                type: locations[0].type || "S"
-            };
+            return { name: locations[0].name, extId: locations[0].extId, type: locations[0].type || "S" };
         }
         return null;
-    } catch (error) {
-        console.log("Station search error:", error.message);
-        return null;
-    }
+    } catch (error) { return null; }
 }
 
 async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = null) {
@@ -237,28 +188,12 @@ async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = 
         const time = now.toTimeString().slice(0, 8).replace(/:/g, '');
         
         const requestBody = {
-            svcReqL: [{
-                req: {
-                    stbLoc: { extId: station.extId, type: station.type },
-                    type: "DEP",
-                    maxJny: maxResults,
-                    date: date,
-                    time: time
-                },
-                meth: "StationBoard",
-                id: "1|1|"
-            }],
+            svcReqL: [{ req: { stbLoc: { extId: station.extId, type: station.type }, type: "DEP", maxJny: maxResults, date: date, time: time }, meth: "StationBoard", id: "1|1|" }],
             client: { id: "VAO", v: "1", type: "AND", name: "nextgen" },
-            ver: "1.73",
-            lang: "en",
-            auth: { aid: "nextgen", type: "AID" }
+            ver: "1.73", lang: "en", auth: { aid: "nextgen", type: "AID" }
         };
         
-        const response = await axios.post(VAO_API_URL, requestBody, {
-            timeout: 8000,
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
+        const response = await axios.post(VAO_API_URL, requestBody, { timeout: 8000, headers: { 'Content-Type': 'application/json' } });
         const journeys = response.data?.svcResL?.[0]?.res?.jnyL || [];
         const common = response.data?.svcResL?.[0]?.res?.common;
         
@@ -268,64 +203,29 @@ async function getRealTimeDepartures(stationName, maxResults = 30, filterLine = 
             const prod = common?.prodL?.[jny.prodX];
             const depTime = jny.stbStop?.dTimeS || "";
             const delay = jny.stbStop?.dTimeR ? parseInt(jny.stbStop.dTimeR) - parseInt(jny.stbStop.dTimeS) : 0;
-            
-            let line = prod?.name || prod?.line || "";
-            let productName = prod?.name || "";
-            
             let busNumber = null;
-            const numberMatch = productName.match(/\b(\d{2,3})\b/);
+            const numberMatch = (prod?.name || "").match(/\b(\d{2,3})\b/);
             if (numberMatch) busNumber = numberMatch[1];
-            const lineMatch = line.match(/\b(\d{2,3})\b/);
-            if (lineMatch && !busNumber) busNumber = lineMatch[1];
-            
-            return {
-                busNumber: busNumber,
-                direction: jny.dirTxt || "",
-                departureTime: depTime ? `${depTime.slice(0,2)}:${depTime.slice(2,4)}` : "--:--",
-                delay: delay
-            };
-        });
+            return { busNumber, direction: jny.dirTxt || "", departureTime: depTime ? `${depTime.slice(0,2)}:${depTime.slice(2,4)}` : "--:--", delay };
+        }).filter(r => r.busNumber && r.departureTime !== "--:--");
         
-        results = results.filter(r => r.busNumber && r.departureTime !== "--:--");
-        
-        const uniqueResults = [];
+        const uniqueResults = []; 
         const seen = new Set();
         for (const r of results) {
             const key = `${r.busNumber}|${r.direction}|${r.departureTime}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniqueResults.push(r);
-            }
+            if (!seen.has(key)) { seen.add(key); uniqueResults.push(r); }
         }
         
-        if (filterLine) {
-            return uniqueResults.filter(r => r.busNumber === filterLine);
-        }
-        
-        return uniqueResults;
-        
-    } catch (error) {
-        console.error('VAO API error:', error.message);
-        return null;
-    }
+        return filterLine ? uniqueResults.filter(r => r.busNumber === filterLine) : uniqueResults;
+    } catch (error) { return null; }
 }
 
-// ========== TIMEZONE CORRECTION ==========
 function convertToLocalTime(utcTimeStr) {
     if (!utcTimeStr || utcTimeStr === '--:--') return utcTimeStr;
-    
     const [hours, minutes] = utcTimeStr.split(':').map(Number);
-    const utcDate = new Date();
+    const utcDate = new Date(); 
     utcDate.setUTCHours(hours, minutes, 0, 0);
-    
-    const localTime = utcDate.toLocaleTimeString('en-GB', {
-        timeZone: 'Europe/Vienna',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
-    
-    return localTime;
+    return utcDate.toLocaleTimeString('en-GB', { timeZone: 'Europe/Vienna', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 // ========== WEATHER DATA ==========
@@ -337,232 +237,70 @@ let weatherCache = {
 
 async function getWeatherData() {
     const apiKey = process.env.WEATHERAPI_KEY;
+    if (!apiKey) return getWeatherDataMET();
     
-    if (!apiKey) {
-        console.log('🌤️ Weather: No WeatherAPI key, falling back to MET Norway');
-        return getWeatherDataMET();
-    }
-    
-    const url = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=Salzburg&days=3&aqi=no&alerts=no`;
-
     try {
-        console.log('🌤️ Weather: Fetching from WeatherAPI.com...');
-        const response = await axios.get(url, { timeout: 10000 });
-
-        if (!response.data || !response.data.forecast) {
-            console.log('🌤️ Weather: Invalid response from WeatherAPI');
-            return null;
-        }
-
-        const forecastDays = response.data.forecast.forecastday;
-
+        const response = await axios.get(`https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=Salzburg&days=3&aqi=no&alerts=no`, { timeout: 10000 });
+        if (!response.data?.forecast) return null;
         return {
             city: response.data.location.name,
-            current: {
-                temp: Math.round(response.data.current.temp_c),
-                condition: response.data.current.condition.text,
-                wind: Math.round(response.data.current.wind_kph)
-            },
-            forecast: forecastDays.map(day => ({
+            current: { temp: Math.round(response.data.current.temp_c), condition: response.data.current.condition.text, wind: Math.round(response.data.current.wind_kph) },
+            forecast: response.data.forecast.forecastday.map(day => ({
                 day: new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }),
                 high: Math.round(day.day.maxtemp_c),
                 low: Math.round(day.day.mintemp_c),
                 condition: day.day.condition.text
             }))
         };
-
-    } catch (error) {
-        console.error('🌤️ WeatherAPI.com error:', error.message);
-        console.log('🌤️ Weather: Falling back to MET Norway');
-        return getWeatherDataMET();
-    }
+    } catch (error) { return getWeatherDataMET(); }
 }
 
 async function getWeatherDataMET() {
-    const lat = 47.80949;
-    const lon = 13.05501;
-    const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`;
-
     try {
-        console.log('🌤️ Weather: Fetching from MET Norway (fallback)...');
-        
-        const response = await axios.get(url, {
-            headers: {
-                'User-Agent': 'Hotel Vogelweiderhof Chatbot (office@vogelweiderhof.at)'
-            },
+        const response = await axios.get(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=47.80949&lon=13.05501`, {
+            headers: { 'User-Agent': 'Hotel Vogelweiderhof Chatbot (office@vogelweiderhof.at)' },
             timeout: 10000
         });
-
-        if (!response.data || !response.data.properties || !response.data.properties.timeseries) {
-            return null;
-        }
-
-        const timeseries = response.data.properties.timeseries;
-        if (timeseries.length === 0) return null;
-
+        const timeseries = response.data?.properties?.timeseries;
+        if (!timeseries?.length) return null;
+        
         const currentData = timeseries[0].data.instant.details;
-        let currentCondition = 'Unknown';
-        if (currentData.symbol_code) {
-            currentCondition = getConditionFromSymbol(currentData.symbol_code);
-        }
-
+        const conditions = { 'clearsky': 'Clear', 'fair': 'Fair', 'partlycloudy': 'Partly cloudy', 'cloudy': 'Cloudy', 'rain': 'Rain', 'heavyrain': 'Heavy rain', 'rainshowers': 'Rain showers', 'snow': 'Snow', 'fog': 'Fog', 'thunder': 'Thunderstorm' };
+        const currentCondition = conditions[currentData.symbol_code?.split('_')[0]] || 'Unknown';
+        
         const dailyForecasts = {};
         for (let i = 1; i < Math.min(timeseries.length, 24); i++) {
-            const item = timeseries[i];
-            const date = new Date(item.time);
+            const item = timeseries[i]; 
+            const date = new Date(item.time); 
             const dayKey = date.toISOString().split('T')[0];
-            
-            let temp = null;
-            let condition = 'Unknown';
-            
-            if (item.data.next_1_hours && item.data.next_1_hours.details) {
-                const details = item.data.next_1_hours.details;
-                temp = details.air_temperature;
-                if (details.symbol_code) condition = getConditionFromSymbol(details.symbol_code);
-            } else if (item.data.instant && item.data.instant.details) {
-                const details = item.data.instant.details;
-                temp = details.air_temperature;
-                if (details.symbol_code) condition = getConditionFromSymbol(details.symbol_code);
-            }
-            
+            let temp = item.data.next_1_hours?.details?.air_temperature || item.data.instant?.details?.air_temperature;
             if (temp !== null) {
-                if (!dailyForecasts[dayKey]) {
-                    dailyForecasts[dayKey] = { temps: [], conditions: [], date: date };
-                }
+                if (!dailyForecasts[dayKey]) dailyForecasts[dayKey] = { temps: [], date };
                 dailyForecasts[dayKey].temps.push(temp);
-                if (condition !== 'Unknown') dailyForecasts[dayKey].conditions.push(condition);
             }
         }
-        
-        const forecast = [];
-        const dayKeys = Object.keys(dailyForecasts).slice(0, 3);
-        for (const key of dayKeys) {
-            const dayData = dailyForecasts[key];
-            let condition = 'Unknown';
-            if (dayData.conditions.length > 0) {
-                const conditionCounts = {};
-                for (const c of dayData.conditions) {
-                    conditionCounts[c] = (conditionCounts[c] || 0) + 1;
-                }
-                let maxCount = 0;
-                for (const [c, count] of Object.entries(conditionCounts)) {
-                    if (count > maxCount) { maxCount = count; condition = c; }
-                }
-            }
-            forecast.push({
-                day: dayData.date.toLocaleDateString('en-US', { weekday: 'short' }),
-                high: Math.round(Math.max(...dayData.temps)),
-                low: Math.round(Math.min(...dayData.temps)),
-                condition: condition
-            });
-        }
-
-        while (forecast.length < 3) {
-            const futureDate = new Date();
-            futureDate.setDate(futureDate.getDate() + forecast.length + 1);
-            forecast.push({
-                day: futureDate.toLocaleDateString('en-US', { weekday: 'short' }),
-                high: '--',
-                low: '--',
-                condition: 'Unknown'
-            });
-        }
-
-        return {
-            city: 'Salzburg',
-            current: {
-                temp: Math.round(currentData.air_temperature),
-                condition: currentCondition,
-                wind: Math.round(currentData.wind_speed || 0)
-            },
-            forecast: forecast
-        };
-
-    } catch (error) {
-        console.error('🌤️ MET Norway fallback error:', error.message);
-        return null;
-    }
+        const forecast = Object.keys(dailyForecasts).slice(0, 3).map(key => ({
+            day: dailyForecasts[key].date.toLocaleDateString('en-US', { weekday: 'short' }),
+            high: Math.round(Math.max(...dailyForecasts[key].temps)),
+            low: Math.round(Math.min(...dailyForecasts[key].temps)),
+            condition: currentCondition
+        }));
+        return { city: 'Salzburg', current: { temp: Math.round(currentData.air_temperature), condition: currentCondition, wind: Math.round(currentData.wind_speed || 0) }, forecast };
+    } catch (error) { return null; }
 }
-
-function getConditionFromSymbol(symbolCode) {
-    if (!symbolCode) return 'Unknown';
-    const cleanCode = symbolCode.split('_')[0];
-    const conditions = {
-        'clearsky': 'Clear', 'fair': 'Fair', 'partlycloudy': 'Partly cloudy',
-        'cloudy': 'Cloudy', 'rain': 'Rain', 'heavyrain': 'Heavy rain',
-        'rainshowers': 'Rain showers', 'heavyrainshowers': 'Heavy rain showers',
-        'snow': 'Snow', 'heavysnow': 'Heavy snow', 'snowshowers': 'Snow showers',
-        'fog': 'Fog', 'thunder': 'Thunderstorm', 'sleet': 'Sleet'
-    };
-    return conditions[cleanCode] || cleanCode || 'Unknown';
-}
-
-// ========== BUS SCHEDULE HELPERS ==========
 
 async function getBusSchedule(busNumber, direction = 'citycenter') {
-    const station = "Baron Schwarz Park";
-    const departures = await getRealTimeDepartures(station, 30, busNumber);
-    
-    if (!departures || departures.length === 0) {
-        return null;
-    }
-    
-    let filteredDepartures = departures;
-    if (direction === 'citycenter') {
-        filteredDepartures = departures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn'));
-    } else if (direction === 'trainstation') {
-        filteredDepartures = departures.filter(d => 
-            d.direction.toLowerCase().includes('hauptbahnhof') || 
-            d.direction.toLowerCase().includes('hbf') ||
-            d.direction.toLowerCase().includes('bahnhof')
-        );
-    }
-    
-    if (filteredDepartures.length === 0) {
-        return null;
-    }
-    
-    filteredDepartures.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
-    
-    const localTimes = filteredDepartures.slice(0, 5).map(b => ({
-        time: convertToLocalTime(b.departureTime),
-        delay: b.delay
-    }));
-    
-    return localTimes;
+    const departures = await getRealTimeDepartures("Baron Schwarz Park", 30, busNumber);
+    if (!departures?.length) return null;
+    let filtered = departures;
+    if (direction === 'citycenter') filtered = departures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn'));
+    else if (direction === 'trainstation') filtered = departures.filter(d => d.direction.toLowerCase().includes('hauptbahnhof') || d.direction.toLowerCase().includes('hbf'));
+    if (!filtered.length) return null;
+    filtered.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
+    return filtered.slice(0, 5).map(b => ({ time: convertToLocalTime(b.departureTime), delay: b.delay }));
 }
 
-function formatBusResponse(busNumber, times, direction, lang = 'en') {
-    if (!times || times.length === 0) {
-        return getFallbackResponse(lang, 'bus');
-    }
-    
-    const directionNames = {
-        'citycenter': { en: 'City Center (Fürstenbrunn)', de: 'Stadtzentrum (Fürstenbrunn)' },
-        'trainstation': { en: 'Train Station (Hauptbahnhof)', de: 'Hauptbahnhof' }
-    };
-    
-    const dirName = directionNames[direction]?.[lang] || direction;
-    
-    let response = lang === 'de' 
-        ? `Die nächsten Abfahrten für Bus ${busNumber} in Richtung ${dirName}:\n\n`
-        : `Next departures for Bus ${busNumber} towards ${dirName}:\n\n`;
-    
-    for (const t of times) {
-        const delayText = t.delay > 0 ? ` (${t.delay} min ${lang === 'de' ? 'Verspätung' : 'delay'})` : '';
-        response += `• ${t.time}${delayText}\n`;
-    }
-    
-    if (lang === 'de') {
-        response += `\nHaltestelle: Baron Schwarz Park (30 Meter vom Hotel). Ihre Gästekarte macht die Fahrt KOSTENLOS.`;
-    } else {
-        response += `\nBus stop: Baron Schwarz Park (30 meters from the hotel). Your Guest Mobility Ticket makes the ride FREE.`;
-    }
-    
-    return response;
-}
-
-// ========== API ENDPOINTS ==========
+// ========== PUBLIC API ENDPOINTS ==========
 
 // Bus Times
 app.get('/api/bus-times', async (req, res) => {
@@ -570,132 +308,43 @@ app.get('/api/bus-times', async (req, res) => {
     if (busDataCache.data && busDataCache.timestamp && (now - busDataCache.timestamp) < busDataCache.expiryMs) {
         return res.json(busDataCache.data);
     }
-    
     try {
-        const hotelDepartures = await getRealTimeDepartures("Baron Schwarz Park", 30, "21");
-        const cityCenterBuses = hotelDepartures ? hotelDepartures.filter(d => d.direction.toLowerCase().includes('fürstenbrunn')) : [];
-        
-        const bus120Departures = await getRealTimeDepartures("Baron Schwarz Park", 30, "120");
-        const trainStationBuses120 = bus120Departures ? bus120Departures.filter(d => 
-            d.direction.toLowerCase().includes('hauptbahnhof') || 
-            d.direction.toLowerCase().includes('hbf') ||
-            d.direction.toLowerCase().includes('bahnhof')
-        ) : [];
-        
-        const bus121Departures = await getRealTimeDepartures("Baron Schwarz Park", 30, "121");
-        const trainStationBuses121 = bus121Departures ? bus121Departures.filter(d => 
-            d.direction.toLowerCase().includes('hauptbahnhof') || 
-            d.direction.toLowerCase().includes('hbf') ||
-            d.direction.toLowerCase().includes('bahnhof')
-        ) : [];
-        
-        const combinedTrainBuses = [...trainStationBuses120, ...trainStationBuses121];
-        combinedTrainBuses.sort((a, b) => a.departureTime.localeCompare(b.departureTime));
-        
-        const uniqueTrainBuses = [];
-        const seenTimes = new Set();
-        for (const bus of combinedTrainBuses) {
-            if (!seenTimes.has(bus.departureTime)) {
-                seenTimes.add(bus.departureTime);
-                uniqueTrainBuses.push(bus);
-            }
-        }
-        
-        const correctedCityCenterBuses = cityCenterBuses.map(b => ({
-            ...b,
-            departureTime: convertToLocalTime(b.departureTime)
-        }));
-        
-        const correctedTrainBuses = uniqueTrainBuses.map(b => ({
-            ...b,
-            departureTime: convertToLocalTime(b.departureTime)
-        }));
-        
+        const cityBuses = (await getRealTimeDepartures("Baron Schwarz Park", 30, "21") || []).filter(d => d.direction.toLowerCase().includes('fürstenbrunn')).map(b => ({ ...b, departureTime: convertToLocalTime(b.departureTime) }));
+        const trainBuses120 = (await getRealTimeDepartures("Baron Schwarz Park", 30, "120") || []).filter(d => d.direction.toLowerCase().includes('hauptbahnhof') || d.direction.toLowerCase().includes('hbf'));
+        const trainBuses121 = (await getRealTimeDepartures("Baron Schwarz Park", 30, "121") || []).filter(d => d.direction.toLowerCase().includes('hauptbahnhof') || d.direction.toLowerCase().includes('hbf'));
+        const combined = [...trainBuses120, ...trainBuses121].sort((a, b) => a.departureTime.localeCompare(b.departureTime));
+        const unique = []; const seen = new Set();
+        for (const bus of combined) { if (!seen.has(bus.departureTime)) { seen.add(bus.departureTime); unique.push(bus); } }
         const busData = {
             timestamp: new Date().toISOString(),
-            bus21: { 
-                times: correctedCityCenterBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) 
-            },
-            bus120: { 
-                times: correctedTrainBuses.slice(0, 6).map(b => ({ 
-                    time: b.departureTime, 
-                    delay: b.delay,
-                    busNumber: b.busNumber 
-                }))
-            }
+            bus21: { times: cityBuses.slice(0, 6).map(b => ({ time: b.departureTime, delay: b.delay })) },
+            bus120: { times: unique.slice(0, 6).map(b => ({ time: convertToLocalTime(b.departureTime), delay: b.delay, busNumber: b.busNumber })) }
         };
-        
         busDataCache = { data: busData, timestamp: now, expiryMs: 60000 };
         res.json(busData);
-        
-    } catch (error) {
-        console.error('❌ Bus API error:', error.message);
-        res.status(500).json({ error: 'Failed to fetch bus times' });
-    }
+    } catch (error) { res.status(500).json({ error: 'Failed to fetch bus times' }); }
 });
 
 // Weather
 app.get('/api/weather', async (req, res) => {
     const now = Date.now();
-    
     if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
-        console.log('🌤️ Weather: Returning cached data');
         return res.json(weatherCache.data);
     }
-    
-    console.log('🌤️ Weather: Cache expired, fetching fresh data...');
     const weatherData = await getWeatherData();
-    
     if (weatherData) {
-        weatherCache = { 
-            data: weatherData, 
-            timestamp: now, 
-            expiryMs: 1800000
-        };
-        console.log('🌤️ Weather: Fresh data cached for 30 minutes');
+        weatherCache = { data: weatherData, timestamp: now, expiryMs: 1800000 };
         res.json(weatherData);
-    } else {
-        console.error('🌤️ Weather: Failed to fetch data');
-        res.status(500).json({ error: 'Failed to fetch weather' });
-    }
+    } else { res.status(500).json({ error: 'Failed to fetch weather' }); }
 });
 
 // Health Check
-app.get('/health', (req, res) => {
-    res.status(200).send('OK');
-});
-
-// ========== STATIC KNOWLEDGE BASE ==========
-function getKnowledgeBase() {
-    return {
-        stops: {
-            "Baron Schwarz Park": "Hotel bus stop, 30m from hotel",
-            "Hanuschplatz": "City center stop, near Old Town",
-            "Salzburg Hbf": "Main Train Station"
-        },
-        routes: {
-            "21": { desc: "Hotel ↔ City Center", dirs: { "Fürstenbrunn": "City Center", "Bergheim": "Back to Hotel" } },
-            "120": { desc: "Hotel ↔ Train Station", dirs: { "Hauptbahnhof": "Train Station", "Pelting": "Back to Hotel" } }
-        },
-        ticket: { name: "Guest Mobility Ticket", desc: "FREE public transport" },
-        restaurants: [
-            { name: "Smash to Go", loc: "Beside hotel", cuisine: "Burgers", discount: "15%" },
-            { name: "Mr. Cevap", loc: "1 min walk", cuisine: "Balkan grill" },
-            { name: "Turnerwirt", loc: "3 min walk", cuisine: "Austrian" }
-        ],
-        sights: [
-            { name: "Hohensalzburg Fortress", desc: "Largest castle in Central Europe" },
-            { name: "Mirabell Palace", desc: "Baroque palace, free gardens" },
-            { name: "Mozart's Birthplace", desc: "Getreidegasse 9" },
-            { name: "Salzburg Cathedral", desc: "Baroque cathedral" }
-        ]
-    };
-}
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // ========== FAQ LOADER ==========
+const FAQ_PATH = path.join(__dirname, 'hotel-faqs.txt');
 let cachedFAQ = null;
 let lastFAQModified = 0;
-const FAQ_PATH = path.join(__dirname, 'hotel-faqs.txt');
 
 function loadFAQs() {
     try {
@@ -705,9 +354,7 @@ function loadFAQs() {
         cachedFAQ = fs.readFileSync(FAQ_PATH, 'utf8');
         lastFAQModified = stats.mtimeMs;
         return cachedFAQ;
-    } catch (error) { 
-        return "FAQ unavailable"; 
-    }
+    } catch (error) { return "FAQ unavailable"; }
 }
 
 // ========== ANALYTICS ==========
@@ -727,9 +374,7 @@ function loadAnalytics() {
                 const parsed = JSON.parse(backupData);
                 console.log(`✅ Analytics loaded from backup file`);
                 return parsed;
-            } catch (e) {
-                console.log('⚠️ Backup file also corrupted, starting fresh');
-            }
+            } catch (e) { console.log('⚠️ Backup file also corrupted, starting fresh'); }
         }
     }
     return null;
@@ -738,137 +383,60 @@ function loadAnalytics() {
 function saveAnalytics() {
     try {
         const dataToSave = {
-            q: analytics.q,
-            tk: analytics.tk,
-            pt: analytics.pt,
-            ct: analytics.ct,
-            cost: analytics.cost,
-            inputCost: analytics.inputCost,
-            outputCost: analytics.outputCost,
-            topQ: Object.fromEntries(analytics.topQ),
-            sessions: Array.from(analytics.sessions),
-            byCat: analytics.byCat,
-            recent: analytics.recent.slice(0, 30),
-            startTime: analytics.startTime,
-            savedAt: Date.now()
+            q: analytics.q, tk: analytics.tk, pt: analytics.pt, ct: analytics.ct,
+            cost: analytics.cost, inputCost: analytics.inputCost, outputCost: analytics.outputCost,
+            topQ: Object.fromEntries(analytics.topQ), sessions: Array.from(analytics.sessions),
+            byCat: analytics.byCat, recent: analytics.recent.slice(0, 30),
+            startTime: analytics.startTime, savedAt: Date.now()
         };
-        
         fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(dataToSave, null, 2));
         fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(dataToSave, null, 2));
-        
         console.log(`💾 Analytics saved (${analytics.q} questions, $${analytics.cost.toFixed(4)})`);
-    } catch (error) {
-        console.error('❌ Failed to save analytics:', error.message);
-    }
+    } catch (error) { console.error('❌ Failed to save analytics:', error.message); }
 }
 
 function restoreAnalytics(savedData) {
     if (!savedData) return;
-    
-    analytics.q = savedData.q || 0;
-    analytics.tk = savedData.tk || 0;
-    analytics.pt = savedData.pt || 0;
-    analytics.ct = savedData.ct || 0;
-    analytics.cost = savedData.cost || 0;
-    analytics.inputCost = savedData.inputCost || 0;
-    analytics.outputCost = savedData.outputCost || 0;
-    analytics.topQ = new Map(Object.entries(savedData.topQ || {}));
-    analytics.sessions = new Set(savedData.sessions || []);
-    analytics.byCat = savedData.byCat || {};
-    analytics.recent = savedData.recent || [];
-    analytics.startTime = savedData.startTime || Date.now();
-    
+    analytics.q = savedData.q || 0; analytics.tk = savedData.tk || 0; analytics.pt = savedData.pt || 0; analytics.ct = savedData.ct || 0;
+    analytics.cost = savedData.cost || 0; analytics.inputCost = savedData.inputCost || 0; analytics.outputCost = savedData.outputCost || 0;
+    analytics.topQ = new Map(Object.entries(savedData.topQ || {})); analytics.sessions = new Set(savedData.sessions || []);
+    analytics.byCat = savedData.byCat || {}; analytics.recent = savedData.recent || []; analytics.startTime = savedData.startTime || Date.now();
     console.log(`📊 Analytics restored: ${analytics.q} questions, $${analytics.cost.toFixed(4)} cost`);
 }
 
 const analytics = {
-    q: 0,
-    tk: 0,
-    pt: 0,
-    ct: 0,
-    cost: 0,
-    inputCost: 0,
-    outputCost: 0,
-    topQ: new Map(),
-    sessions: new Set(),
-    byCat: {},
-    recent: [],
-    startTime: Date.now()
+    q: 0, tk: 0, pt: 0, ct: 0, cost: 0, inputCost: 0, outputCost: 0,
+    topQ: new Map(), sessions: new Set(), byCat: {}, recent: [], startTime: Date.now()
 };
 
 const savedAnalytics = loadAnalytics();
-if (savedAnalytics) {
-    restoreAnalytics(savedAnalytics);
-}
+if (savedAnalytics) restoreAnalytics(savedAnalytics);
 
 let questionsSinceLastSave = 0;
 const SAVE_AFTER_QUESTIONS = 10;
 
 function checkAndSaveAnalytics() {
     questionsSinceLastSave++;
-    if (questionsSinceLastSave >= SAVE_AFTER_QUESTIONS) {
-        saveAnalytics();
-        questionsSinceLastSave = 0;
-    }
+    if (questionsSinceLastSave >= SAVE_AFTER_QUESTIONS) { saveAnalytics(); questionsSinceLastSave = 0; }
 }
 
-setInterval(() => {
-    saveAnalytics();
-}, 5 * 60 * 1000);
-
-process.on('SIGINT', () => {
-    console.log('\n🔄 Saving analytics before shutdown...');
-    saveAnalytics();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    console.log('\n🔄 Saving analytics before shutdown...');
-    saveAnalytics();
-    process.exit(0);
-});
+setInterval(saveAnalytics, 5 * 60 * 1000);
+process.on('SIGINT', () => { console.log('\n🔄 Saving analytics before shutdown...'); saveAnalytics(); process.exit(0); });
+process.on('SIGTERM', () => { console.log('\n🔄 Saving analytics before shutdown...'); saveAnalytics(); process.exit(0); });
 
 function createDailyBackup() {
     try {
         const today = getTodayStr();
         const archiveFile = path.join(__dirname, `analytics-${today}.json`);
         if (fs.existsSync(archiveFile)) return;
-        
-        const dataToSave = {
-            q: analytics.q,
-            tk: analytics.tk,
-            pt: analytics.pt,
-            ct: analytics.ct,
-            cost: analytics.cost,
-            inputCost: analytics.inputCost,
-            outputCost: analytics.outputCost,
-            topQ: Object.fromEntries(analytics.topQ),
-            sessions: Array.from(analytics.sessions),
-            byCat: analytics.byCat,
-            recent: analytics.recent.slice(0, 20),
-            startTime: analytics.startTime,
-            savedAt: Date.now()
-        };
-        
+        const dataToSave = { q: analytics.q, tk: analytics.tk, pt: analytics.pt, ct: analytics.ct, cost: analytics.cost, inputCost: analytics.inputCost, outputCost: analytics.outputCost, topQ: Object.fromEntries(analytics.topQ), sessions: Array.from(analytics.sessions), byCat: analytics.byCat, recent: analytics.recent.slice(0, 20), startTime: analytics.startTime, savedAt: Date.now() };
         fs.writeFileSync(archiveFile, JSON.stringify(dataToSave, null, 2));
         console.log(`📁 Daily archive created: analytics-${today}.json`);
-        
         const files = fs.readdirSync(__dirname);
-        const archiveFiles = files.filter(f => 
-            f.startsWith('analytics-') && 
-            f.endsWith('.json') && 
-            f !== 'analytics.json' && 
-            f !== 'analytics.json.bak'
-        );
+        const archiveFiles = files.filter(f => f.startsWith('analytics-') && f.endsWith('.json') && f !== 'analytics.json' && f !== 'analytics.json.bak');
         archiveFiles.sort().reverse();
-        const toDelete = archiveFiles.slice(3);
-        for (const file of toDelete) {
-            fs.unlinkSync(path.join(__dirname, file));
-            console.log(`🗑️ Deleted old archive: ${file}`);
-        }
-    } catch (error) {
-        console.error('❌ Failed to create daily backup:', error.message);
-    }
+        for (const file of archiveFiles.slice(3)) { fs.unlinkSync(path.join(__dirname, file)); console.log(`🗑️ Deleted old archive: ${file}`); }
+    } catch (error) { console.error('❌ Failed to create daily backup:', error.message); }
 }
 
 function createMonthlyBackup() {
@@ -876,327 +444,75 @@ function createMonthlyBackup() {
         const monthStr = getMonthStr();
         const archiveFile = path.join(__dirname, `analytics-${monthStr}.json`);
         if (fs.existsSync(archiveFile)) return;
-        
-        const dataToSave = {
-            q: analytics.q,
-            tk: analytics.tk,
-            pt: analytics.pt,
-            ct: analytics.ct,
-            cost: analytics.cost,
-            inputCost: analytics.inputCost,
-            outputCost: analytics.outputCost,
-            topQ: Object.fromEntries(analytics.topQ),
-            sessions: Array.from(analytics.sessions),
-            byCat: analytics.byCat,
-            recent: analytics.recent.slice(0, 20),
-            startTime: analytics.startTime,
-            savedAt: Date.now()
-        };
-        
+        const dataToSave = { q: analytics.q, tk: analytics.tk, pt: analytics.pt, ct: analytics.ct, cost: analytics.cost, inputCost: analytics.inputCost, outputCost: analytics.outputCost, topQ: Object.fromEntries(analytics.topQ), sessions: Array.from(analytics.sessions), byCat: analytics.byCat, recent: analytics.recent.slice(0, 20), startTime: analytics.startTime, savedAt: Date.now() };
         fs.writeFileSync(archiveFile, JSON.stringify(dataToSave, null, 2));
         console.log(`📁 Monthly archive created: analytics-${monthStr}.json`);
-    } catch (error) {
-        console.error('❌ Failed to create monthly backup:', error.message);
-    }
+    } catch (error) { console.error('❌ Failed to create monthly backup:', error.message); }
 }
 
-setInterval(() => {
-    createDailyBackup();
-    if (isLastDayOfMonth()) {
-        createMonthlyBackup();
-    }
-}, 60 * 60 * 1000);
-
-setTimeout(() => {
-    createDailyBackup();
-    if (isLastDayOfMonth()) {
-        createMonthlyBackup();
-    }
-}, 5000);
+setInterval(() => { createDailyBackup(); if (isLastDayOfMonth()) createMonthlyBackup(); }, 60 * 60 * 1000);
+setTimeout(() => { createDailyBackup(); if (isLastDayOfMonth()) createMonthlyBackup(); }, 5000);
 
 function updateAnalytics(usage, cat = 'gen', questionText = '') {
     if (!usage) return;
-    
-    const p = usage.prompt_tokens || 0;
-    const c = usage.completion_tokens || 0;
-    const t = usage.total_tokens || 0;
-    
-    analytics.tk += t;
-    analytics.pt += p;
-    analytics.ct += c;
-    
-    const inputCost = (p / 1000000) * 0.10;
-    const outputCost = (c / 1000000) * 0.30;
-    const totalCost = inputCost + outputCost;
-    
-    analytics.cost += totalCost;
-    analytics.inputCost += inputCost;
-    analytics.outputCost += outputCost;
-    
-    if (!analytics.byCat[cat]) analytics.byCat[cat] = 0;
-    analytics.byCat[cat] += t;
-    
-    if (questionText) {
-        const norm = questionText.toLowerCase().substring(0, 100);
-        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-    }
-    
-    analytics.recent.unshift({
-        ts: new Date().toISOString(),
-        pt: p,
-        ct: c,
-        tk: t,
-        inputCost: inputCost.toFixed(6),
-        outputCost: outputCost.toFixed(6),
-        cost: totalCost.toFixed(6),
-        cat: cat
-    });
+    const p = usage.prompt_tokens || 0; const c = usage.completion_tokens || 0; const t = usage.total_tokens || 0;
+    analytics.tk += t; analytics.pt += p; analytics.ct += c;
+    const inputCost = (p / 1000000) * 0.10; const outputCost = (c / 1000000) * 0.30; const totalCost = inputCost + outputCost;
+    analytics.cost += totalCost; analytics.inputCost += inputCost; analytics.outputCost += outputCost;
+    if (!analytics.byCat[cat]) analytics.byCat[cat] = 0; analytics.byCat[cat] += t;
+    if (questionText) { const norm = questionText.toLowerCase().substring(0, 100); analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1); }
+    analytics.recent.unshift({ ts: new Date().toISOString(), pt: p, ct: c, tk: t, inputCost: inputCost.toFixed(6), outputCost: outputCost.toFixed(6), cost: totalCost.toFixed(6), cat: cat });
     if (analytics.recent.length > 50) analytics.recent.pop();
-    
-    analytics.q++;
-    checkAndSaveAnalytics();
+    analytics.q++; checkAndSaveAnalytics();
 }
 
-// ========== BOT CONFIG ==========
-let botConfig = {
-    personality: "Helpful hotel front desk agent at Hotel Vogelweiderhof.",
-    safetyRules: "No credit cards. No guest data sharing.",
-    styleRules: "Direct, helpful, warm. Never end with questions.",
-    bookingLink: "https://direct-book.com/properties/hotelvogelweiderhof"
-};
-
-// ========== LIMITS ==========
-let limitsConfig = {
-    maxTokens: 450,
-    maxSession: 20,
-    maxMinute: 10,
-    dailyQuota: 500,
-    topicFilter: true
-};
+// ========== BOT CONFIG & LIMITS ==========
+let botConfig = { personality: "Helpful hotel front desk agent at Hotel Vogelweiderhof.", safetyRules: "No credit cards. No guest data sharing.", styleRules: "Direct, helpful, warm. Never end with questions.", bookingLink: "https://direct-book.com/properties/hotelvogelweiderhof" };
+let limitsConfig = { maxTokens: 450, maxSession: 20, maxMinute: 10, dailyQuota: 500 };
 
 const usageTracker = new Map();
 
 function checkRateLimit(ip) {
-    const now = Date.now();
-    let data = usageTracker.get(ip);
-    if (!data) {
-        data = { m: 1, mReset: now + 60000, d: 1, dReset: now + 86400000, s: 1 };
-        usageTracker.set(ip, data);
-        analytics.sessions.add(ip);
-        return { allowed: true };
-    }
+    const now = Date.now(); let data = usageTracker.get(ip);
+    if (!data) { data = { m: 1, mReset: now + 60000, d: 1, dReset: now + 86400000, s: 1 }; usageTracker.set(ip, data); analytics.sessions.add(ip); return { allowed: true }; }
     if (now > data.mReset) { data.m = 0; data.mReset = now + 60000; }
     if (now > data.dReset) { data.d = 0; data.dReset = now + 86400000; }
     if (data.m >= limitsConfig.maxMinute) return { allowed: false, msg: "Too many questions. Please wait." };
     if (data.d >= limitsConfig.dailyQuota) return { allowed: false, msg: "Daily limit reached." };
     if (data.s >= limitsConfig.maxSession) return { allowed: false, msg: "Conversation limit reached. Please refresh." };
-    data.m++;
-    data.d++;
-    data.s++;
-    return { allowed: true };
+    data.m++; data.d++; data.s++; return { allowed: true };
 }
 
-setInterval(() => {
-    const now = Date.now();
-    for (const [ip, data] of usageTracker.entries()) {
-        if (now > data.dReset && now > data.mReset) usageTracker.delete(ip);
-    }
-}, 3600000);
+setInterval(() => { const now = Date.now(); for (const [ip, data] of usageTracker.entries()) { if (now > data.dReset && now > data.mReset) usageTracker.delete(ip); } }, 3600000);
 
-// ========== API ENDPOINTS ==========
-
-// Analytics
+// ========== ADMIN API ENDPOINTS ==========
 app.get('/api/analytics', (req, res) => {
-    const topQ = Array.from(analytics.topQ.entries())
-        .sort((a, b) => b[1] - a[1]).slice(0, 15)
-        .map(([q, c]) => ({ q, c }));
+    const topQ = Array.from(analytics.topQ.entries()).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, c]) => ({ q, c }));
     const avg = analytics.q > 0 ? Math.round(analytics.tk / analytics.q) : 0;
-    
-    res.json({
-        q: analytics.q,
-        topQ: topQ,
-        sessions: analytics.sessions.size,
-        startTime: analytics.startTime,
-        token: {
-            cost: analytics.cost.toFixed(4),
-            inputCost: analytics.inputCost.toFixed(4),
-            outputCost: analytics.outputCost.toFixed(4),
-            tk: analytics.tk,
-            pt: analytics.pt,
-            ct: analytics.ct,
-            avg: avg,
-            byCat: analytics.byCat,
-            recent: analytics.recent
-        }
-    });
+    res.json({ q: analytics.q, topQ, sessions: analytics.sessions.size, startTime: analytics.startTime, token: { cost: analytics.cost.toFixed(4), inputCost: analytics.inputCost.toFixed(4), outputCost: analytics.outputCost.toFixed(4), tk: analytics.tk, pt: analytics.pt, ct: analytics.ct, avg, byCat: analytics.byCat, recent: analytics.recent } });
 });
 
-// Limits
-app.get('/api/limits', (req, res) => { res.json(limitsConfig); });
+app.get('/api/limits', (req, res) => res.json(limitsConfig));
+app.post('/api/limits', (req, res) => { const { maxTokens, maxSession, maxMinute, dailyQuota } = req.body; if (maxTokens !== undefined) limitsConfig.maxTokens = maxTokens; if (maxSession !== undefined) limitsConfig.maxSession = maxSession; if (maxMinute !== undefined) limitsConfig.maxMinute = maxMinute; if (dailyQuota !== undefined) limitsConfig.dailyQuota = dailyQuota; res.json({ success: true }); });
 
-app.post('/api/limits', (req, res) => {
-    const { maxTokens, maxSession, maxMinute, dailyQuota, topicFilter } = req.body;
-    if (maxTokens !== undefined) limitsConfig.maxTokens = maxTokens;
-    if (maxSession !== undefined) limitsConfig.maxSession = maxSession;
-    if (maxMinute !== undefined) limitsConfig.maxMinute = maxMinute;
-    if (dailyQuota !== undefined) limitsConfig.dailyQuota = dailyQuota;
-    if (topicFilter !== undefined) limitsConfig.topicFilter = topicFilter;
-    res.json({ success: true });
-});
+app.post('/api/reset-session', (req, res) => { const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'; const data = usageTracker.get(ip); if (data) data.s = 0; conversationMemory.delete(ip); userLanguage.delete(ip); res.json({ success: true }); });
 
-app.post('/api/reset-session', (req, res) => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    const data = usageTracker.get(ip);
-    if (data) { data.s = 0; }
-    conversationMemory.delete(ip);
-    userLanguage.delete(ip);
-    conversationTopic.delete(ip);
-    res.json({ success: true });
-});
+app.post('/api/setup', (req, res) => { const { personality, safetyRules, styleRules } = req.body; if (personality) botConfig.personality = personality; if (safetyRules) botConfig.safetyRules = safetyRules; if (styleRules) botConfig.styleRules = styleRules; res.json({ success: true }); });
+app.post('/api/update-rules', (req, res) => { const { personality, safetyRules, styleRules } = req.body; if (personality !== undefined) botConfig.personality = personality; if (safetyRules !== undefined) botConfig.safetyRules = safetyRules; if (styleRules !== undefined) botConfig.styleRules = styleRules; res.json({ success: true }); });
+app.get('/api/get-rules', (req, res) => res.json({ personality: botConfig.personality, safetyRules: botConfig.safetyRules, styleRules: botConfig.styleRules, bookingLink: botConfig.bookingLink }));
 
-// Setup and Rules
-app.post('/api/setup', (req, res) => {
-    const { personality, safetyRules, styleRules } = req.body;
-    if (personality) botConfig.personality = personality;
-    if (safetyRules) botConfig.safetyRules = safetyRules;
-    if (styleRules) botConfig.styleRules = styleRules;
-    res.json({ success: true });
-});
+app.get('/api/backups', (req, res) => { try { const files = fs.readdirSync(__dirname); const backupFiles = files.filter(f => (f.startsWith('analytics-') && f.endsWith('.json')) || f === 'analytics.json' || f === 'analytics.json.bak'); backupFiles.sort((a, b) => { if (a === 'analytics.json') return -1; if (b === 'analytics.json') return 1; if (a === 'analytics.json.bak') return -1; if (b === 'analytics.json.bak') return 1; return b.localeCompare(a); }); res.json({ backups: backupFiles }); } catch (error) { res.status(500).json({ error: error.message }); } });
 
-app.post('/api/update-rules', (req, res) => {
-    const { personality, safetyRules, styleRules } = req.body;
-    if (personality !== undefined) botConfig.personality = personality;
-    if (safetyRules !== undefined) botConfig.safetyRules = safetyRules;
-    if (styleRules !== undefined) botConfig.styleRules = styleRules;
-    res.json({ success: true });
-});
+app.get('/api/backup/:filename', (req, res) => { try { const filename = req.params.filename; const filePath = path.join(__dirname, filename); if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' }); const data = fs.readFileSync(filePath, 'utf8'); const parsed = JSON.parse(data); res.json({ label: filename.replace('analytics-', '').replace('.json', ''), q: parsed.q || 0, cost: parsed.cost || '0.0000', sessions: parsed.sessions ? parsed.sessions.length : 0, timestamp: parsed.savedAt || parsed.lastSaved || parsed.startTime, token: { cost: parsed.cost || '0.0000', tk: parsed.tk || 0, pt: parsed.pt || 0, ct: parsed.ct || 0, avg: parsed.q > 0 ? Math.round((parsed.tk || 0) / parsed.q) : 0, byCat: parsed.byCat || {}, recent: parsed.recent || [] }, topQ: Array.from(Object.entries(parsed.topQ || {})).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, c]) => ({ q, c })) }); } catch (error) { res.status(500).json({ error: error.message }); } });
 
-app.get('/api/get-rules', (req, res) => {
-    res.json({
-        personality: botConfig.personality,
-        safetyRules: botConfig.safetyRules,
-        styleRules: botConfig.styleRules,
-        bookingLink: botConfig.bookingLink
-    });
-});
+app.delete('/api/backup/:filename', (req, res) => { try { const filename = req.params.filename; const filePath = path.join(__dirname, filename); if (filename === 'analytics.json' || filename === 'analytics.json.bak') return res.status(400).json({ error: 'Cannot delete current analytics file' }); if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' }); fs.unlinkSync(filePath); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
 
-// ========== BACKUP BROWSER API ENDPOINTS ==========
-
-app.get('/api/backups', (req, res) => {
-    try {
-        const files = fs.readdirSync(__dirname);
-        const backupFiles = files.filter(f => 
-            (f.startsWith('analytics-') && f.endsWith('.json')) || 
-            f === 'analytics.json' || 
-            f === 'analytics.json.bak'
-        );
-        
-        backupFiles.sort((a, b) => {
-            if (a === 'analytics.json') return -1;
-            if (b === 'analytics.json') return 1;
-            if (a === 'analytics.json.bak') return -1;
-            if (b === 'analytics.json.bak') return 1;
-            return b.localeCompare(a);
-        });
-        
-        res.json({ backups: backupFiles });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/backup/:filename', (req, res) => {
-    try {
-        const filename = req.params.filename;
-        const filePath = path.join(__dirname, filename);
-        
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ error: 'Backup file not found' });
-        }
-        
-        const data = fs.readFileSync(filePath, 'utf8');
-        const parsed = JSON.parse(data);
-        
-        const response = {
-            label: filename.replace('analytics-', '').replace('.json', ''),
-            q: parsed.q || 0,
-            cost: parsed.cost || '0.0000',
-            sessions: parsed.sessions ? parsed.sessions.length : 0,
-            timestamp: parsed.savedAt || parsed.lastSaved || parsed.startTime,
-            token: {
-                cost: parsed.cost || '0.0000',
-                tk: parsed.tk || 0,
-                pt: parsed.pt || 0,
-                ct: parsed.ct || 0,
-                avg: parsed.q > 0 ? Math.round((parsed.tk || 0) / parsed.q) : 0,
-                byCat: parsed.byCat || {},
-                recent: parsed.recent || []
-            },
-            topQ: Array.from(Object.entries(parsed.topQ || {}))
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 15)
-                .map(([q, c]) => ({ q, c }))
-        };
-        
-        res.json(response);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.delete('/api/backup/:filename', (req, res) => {
-    try {
-        const filename = req.params.filename;
-        const filePath = path.join(__dirname, filename);
-        
-        if (filename === 'analytics.json' || filename === 'analytics.json.bak') {
-            return res.status(400).json({ error: 'Cannot delete current analytics file' });
-        }
-        
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ error: 'Backup file not found' });
-        }
-        
-        fs.unlinkSync(filePath);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/restore-backup', (req, res) => {
-    try {
-        const { filename } = req.body;
-        const backupPath = path.join(__dirname, filename);
-        
-        if (!fs.existsSync(backupPath)) {
-            return res.status(404).json({ error: 'Backup file not found' });
-        }
-        
-        const backupData = fs.readFileSync(backupPath, 'utf8');
-        const parsed = JSON.parse(backupData);
-        
-        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(parsed, null, 2));
-        fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(parsed, null, 2));
-        
-        restoreAnalytics(parsed);
-        
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+app.post('/api/restore-backup', (req, res) => { try { const { filename } = req.body; const backupPath = path.join(__dirname, filename); if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup file not found' }); const backupData = fs.readFileSync(backupPath, 'utf8'); const parsed = JSON.parse(backupData); fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(parsed, null, 2)); fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(parsed, null, 2)); restoreAnalytics(parsed); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
 
 // ========== GDPR-COMPLIANT SYSTEM PROMPT ==========
 const SYSTEM_PROMPT = `# ROLLE
-Du bist der öffentliche Informations-Chatbot des Hotel Vogelweiderhof in Salzburg
-(Betreiber: LW Hotel KG). Du beantwortest ausschließlich allgemeine Fragen zu
-Hotel, Zimmern, Anreise, Salzburg, Wetter, Öffnungszeiten, Sehenswürdigkeiten,
-Frühstück, Parkplatz, Haustieren, Sprachen und vergleichbaren öffentlichen Themen.
-
-Du bist KEIN Buchungssystem, KEIN Reservierungssystem, KEIN Concierge mit
-Zugriff auf Gastdaten, KEIN Support-Mitarbeiter mit Zugriff auf interne Systeme,
-KEIN Rechts-, Steuer- oder Medizinberater.
+Du bist der öffentliche Informations-Chatbot des Hotel Vogelweiderhof in Salzburg (Betreiber: LW Hotel KG). Du beantwortest ausschließlich allgemeine Fragen zu Hotel, Zimmern, Anreise, Salzburg, Wetter, Öffnungszeiten, Sehenswürdigkeiten, Frühstück, Parkplatz, Haustieren, Sprachen und vergleichbaren öffentlichen Themen.
+Du bist KEIN Buchungssystem, KEIN Reservierungssystem, KEIN Concierge mit Zugriff auf Gastdaten, KEIN Support-Mitarbeiter mit Zugriff auf interne Systeme, KEIN Rechts-, Steuer- oder Medizinberater.
 
 # SPRACHE
 Antworte immer in der Sprache des Gastes. Erkenne die Sprache automatisch.
@@ -1206,10 +522,7 @@ Antworte immer in der Sprache des Gastes. Erkenne die Sprache automatisch.
 # ===============================================================
 
 ## 1. KEINE VERARBEITUNG PERSONENBEZOGENER DATEN
-Du darfst personenbezogene Daten WEDER speichern, WEDER bestätigen, WEDER
-wiederholen, WEDER zusammenfassen, WEDER auswerten, WEDER im weiteren
-Gesprächskontext verwenden.
-
+Du darfst personenbezogene Daten WEDER speichern, WEDER bestätigen, WEDER wiederholen, WEDER zusammenfassen, WEDER auswerten, WEDER im weiteren Gesprächskontext verwenden.
 ### Wenn der Gast solche Daten dennoch eingibt:
 Antworte ausschließlich mit dem Datenschutzhinweis.
 
@@ -1242,7 +555,7 @@ Bei Unsicherheit: Nicht antworten, auf Rezeption verweisen.
 - Wenn du etwas nicht weißt: ehrlich sagen + auf vertrauenswürdige Quellen verweisen (nicht "an die Rezeption")
 
 # WICHTIGE REGELN (ERWEITERT)
-- - Beende Antworten NIEMALS mit Fragen. Das bedeutet: Kein "Would you like...", "Can I help you...", "Is there anything else...", "Do you want...", "Möchten Sie...", "Kann ich...", "Gibt es noch..." oder ähnliche Fragen.
+- Beende Antworten NIEMALS mit Fragen. Das bedeutet: Kein "Would you like...", "Can I help you...", "Is there anything else...", "Do you want...", "Möchten Sie...", "Kann ich...", "Gibt es noch..." oder ähnliche Fragen.
 - Sag NIEMALS "Fragen Sie ruhig" oder "Möchten Sie mehr Details"
 - Sag NIEMALS "Ich weiß nicht" oder "Wir haben diese Information nicht"
 - Verweise Gäste NIEMALS darauf, "an der Rezeption nachzufragen" — stattdessen: "Ich empfehle Ihnen, auf ... zu schauen" oder "Die aktuellsten Details finden Sie auf ..."
@@ -1258,459 +571,141 @@ app.post('/api/chat', async (req, res) => {
     const question = req.body.userMessage;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     
-    if (!apiKey) return res.json({ reply: "❌ Mistral API key missing. Please contact reception." });
+    if (!apiKey) return res.json({ reply: "❌ AI service unavailable. Please contact reception." });
     
     const rate = checkRateLimit(ip);
     if (!rate.allowed) return res.json({ reply: rate.msg });
     
-    const lower = question.toLowerCase();
+    const lower = question.toLowerCase().replace(/[?!.,]/g, '');
+    const wordCount = lower.split(/\s+/).filter(w => w.length > 0).length;
     let history = conversationMemory.get(ip) || [];
     
-    // ========== GET OR DETECT USER LANGUAGE ==========
+    // ========== 1. DETECT LANGUAGE ==========
     let currentLang = userLanguage.get(ip);
-    if (!currentLang) {
-        currentLang = detectLanguage(question);
-        userLanguage.set(ip, currentLang);
+    if (!currentLang) { currentLang = detectLanguage(question); userLanguage.set(ip, currentLang); }
+    
+    // ========== 2. HANDLE LANGUAGE SWITCH ==========
+    const switchMap = { 'auf deutsch': 'de', 'deutsch bitte': 'de', 'sprechen sie deutsch': 'de', 'speak english': 'en', 'in english': 'en', 'english please': 'en', '用中文': 'zh', '中文 please': 'zh' };
+    for (const [phrase, lang] of Object.entries(switchMap)) {
+        if (lower.includes(phrase)) {
+            userLanguage.set(ip, lang); const reply = getLanguageSwitchConfirmation(lang);
+            history.push({ role: "user", content: question.substring(0, 300) }); history.push({ role: "assistant", content: reply });
+            if (history.length > 6) history = history.slice(-6); conversationMemory.set(ip, history); return res.json({ reply });
+        }
     }
     
-    // ========== CHECK FOR LANGUAGE SWITCH REQUEST ==========
-    const languageSwitchKeywords = ['speak english', 'in english', 'english please', 'auf deutsch', 'deutsch bitte', 'sprechen sie deutsch', '用中文', '中文 please'];
-    const isLanguageSwitch = languageSwitchKeywords.some(kw => lower.includes(kw));
+    // ========== 3. GDPR BLOCK (Strict Regex) ==========
+    const piiPattern = /\b(my|mein|meine|our|unser|unsere)\s+(name|email|adresse|room|zimmer|booking|reservierung|passport|reisepass)\b/i;
+    const identityPattern = /\b(ich heiße|mein name ist|i am called|my name is)\b/i;
+    const sensitiveDataPattern = /\b(zimmernummer|buchungsnummer|reservierungsnummer|kreditkarten?|iban|reisepassnummer|booking reference)\b/i;
     
-    if (isLanguageSwitch) {
-        let newLang = 'en';
-        if (lower.includes('auf deutsch') || lower.includes('deutsch bitte') || lower.includes('sprechen sie deutsch')) {
-            newLang = 'de';
-        } else if (lower.includes('用中文') || lower.includes('中文 please')) {
-            newLang = 'zh';
-        } else {
-            newLang = 'en';
-        }
-        userLanguage.set(ip, newLang);
-        const confirmation = getLanguageSwitchConfirmation(newLang);
-        
-        history.push({ role: "user", content: question.substring(0, 300) });
-        history.push({ role: "assistant", content: confirmation });
-        if (history.length > 15) history.splice(0, 3);
-        conversationMemory.set(ip, history);
-        
-        return res.json({ reply: confirmation });
+    if (piiPattern.test(question) || identityPattern.test(question) || sensitiveDataPattern.test(question)) {
+        const reply = getPrivacyNotice(currentLang); analytics.q++; analytics.topQ.set(lower.substring(0, 100), (analytics.topQ.get(lower.substring(0, 100)) || 0) + 1); checkAndSaveAnalytics();
+        history.push({ role: "user", content: "[PII BLOCKED]" }); history.push({ role: "assistant", content: reply });
+        if (history.length > 6) history = history.slice(-6); conversationMemory.set(ip, history); return res.json({ reply });
     }
     
-    // ========== CHECK FOR TRANSLATION REQUEST ==========
-    const translationKeywords = ['translate', 'übersetzen', 'in english', 'auf deutsch', 'translation', 'Übersetzung'];
-    const isTranslationRequest = translationKeywords.some(kw => lower.includes(kw));
-    
-    if (isTranslationRequest && history.length >= 2) {
-        let lastBotMessage = null;
-        for (let i = history.length - 1; i >= 0; i--) {
-            if (history[i].role === 'assistant') {
-                lastBotMessage = history[i].content;
-                break;
-            }
-        }
-        
-        if (lastBotMessage) {
-            const personalDataKeywords = ['name', 'adresse', 'zimmernummer', 'buchungsnummer', 'kennzeichen', 'reisepass', 'kreditkarte', 'iban'];
-            const hasPersonalData = personalDataKeywords.some(keyword => lastBotMessage.toLowerCase().includes(keyword));
-            
-            if (hasPersonalData) {
-                let targetLang = 'en';
-                if (lower.includes('auf deutsch') || lower.includes('german')) targetLang = 'de';
-                else if (lower.includes('中文') || lower.includes('chinese')) targetLang = 'zh';
-                const translatedNotice = getPrivacyNotice(targetLang);
-                const reply = `Here is the translation:\n\n${translatedNotice}`;
-                
-                history.push({ role: "user", content: question.substring(0, 300) });
-                history.push({ role: "assistant", content: reply });
-                if (history.length > 15) history.splice(0, 3);
-                conversationMemory.set(ip, history);
-                return res.json({ reply });
-            } else {
-                try {
-                    const translatePrompt = `Translate the following text to ${currentLang === 'de' ? 'German' : currentLang === 'zh' ? 'Chinese' : 'English'}. Only output the translation, nothing else:\n\n${lastBotMessage}`;
-                    
-                    const translationResponse = await axios.post('https://api.mistral.ai/v1/chat/completions', {
-                        model: "mistral-small-2501",
-                        messages: [{ role: "user", content: translatePrompt }],
-                        temperature: 0.3,
-                        max_tokens: 300
-                    }, {
-                        headers: { 
-                            'Authorization': `Bearer ${apiKey}`, 
-                            'Content-Type': 'application/json' 
-                        },
-                        timeout: 15000
-                    });
-                    
-                    let translatedContent = translationResponse.data.choices[0].message.content;
-                    const reply = `Here is the translation:\n\n${translatedContent}`;
-                    
-                    history.push({ role: "user", content: question.substring(0, 300) });
-                    history.push({ role: "assistant", content: reply });
-                    if (history.length > 15) history.splice(0, 3);
-                    conversationMemory.set(ip, history);
-                    return res.json({ reply });
-                } catch (error) {
-                    console.error('Translation error:', error.message);
-                }
+    // ========== 4. HARDCODED RESPONSES (ONLY for 1-2 word queries) ==========
+    if (wordCount <= 2) {
+        for (const [key, responses] of Object.entries(QUICK_RESPONSES)) {
+            if (lower.includes(key)) {
+                const reply = responses[currentLang] || responses.en; analytics.q++; analytics.topQ.set(lower.substring(0, 100), (analytics.topQ.get(lower.substring(0, 100)) || 0) + 1); checkAndSaveAnalytics();
+                history.push({ role: "user", content: question.substring(0, 300) }); history.push({ role: "assistant", content: reply });
+                if (history.length > 6) history = history.slice(-6); conversationMemory.set(ip, history); return res.json({ reply });
             }
         }
     }
     
-    // ========== HARDCODED RESPONSES ==========
-    for (const [key, responses] of Object.entries(QUICK_RESPONSES)) {
-        if (lower.includes(key)) {
-            const reply = responses[currentLang] || responses.en;
-            analytics.q++;
-            const norm = question.toLowerCase().substring(0, 100);
-            analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-            checkAndSaveAnalytics();
-            
-            history.push({ role: "user", content: question.substring(0, 300) });
-            history.push({ role: "assistant", content: reply });
-            if (history.length > 15) history.splice(0, 3);
-            conversationMemory.set(ip, history);
-            
-            return res.json({ reply });
-        }
-    }
+    // ========== 5. SILENT DATA FETCHER ==========
+    let weatherContext = null; let busContext = null;
     
-    // ========== CHECK FOR PERSONAL DATA TRIGGERS ==========
-    const personalDataTriggers = [
-        'name', 'vorname', 'nachname', 'email', 'telefon', 'handy', 'adresse',
-        'zimmernummer', 'buchungsnummer', 'reservierungsnummer', 'kennzeichen',
-        'reisepass', 'ausweis', 'kreditkarte', 'iban', 'geburtsdatum',
-        'alter', 'ankunft', 'abreise', 'flugnummer', 'zugnummer',
-        'ich heiße', 'mein name', 'meine email', 'meine adresse',
-        'ich wohne', 'ich komme', 'wir sind', 'mein mann', 'meine frau'
-    ];
+    const weatherHint = ['wetter', 'weather', 'rain', 'regen', 'umbrella', 'regenschirm', 'temperature', 'temperatur', 'hot', 'kalt', 'cold', 'sunny'];
+    const outdoorHint = ['walk', 'walking', 'spazieren', 'outside', 'draußen', 'terrace', 'terrasse', 'garden', 'garten'];
+    const directionHint = ['trainstation', 'hauptbahnhof', 'hbf', 'directions', 'weg', 'route', 'how to get', 'arriving', 'ankunft', 'from trainstation'];
+    const shouldFetchWeather = weatherHint.some(kw => lower.includes(kw)) || outdoorHint.some(kw => lower.includes(kw)) || directionHint.some(kw => lower.includes(kw));
     
-    const hasPersonalData = personalDataTriggers.some(trigger => lower.includes(trigger));
-    
-    if (hasPersonalData) {
-        const privacyReply = getPrivacyNotice(currentLang);
-        analytics.q++;
-        const norm = question.toLowerCase().substring(0, 100);
-        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-        checkAndSaveAnalytics();
-        
-        history.push({ role: "user", content: question.substring(0, 300) });
-        history.push({ role: "assistant", content: privacyReply });
-        if (history.length > 15) history.splice(0, 3);
-        conversationMemory.set(ip, history);
-        
-        return res.json({ reply: privacyReply });
-    }
-    
-    // ========== WEATHER QUESTIONS ==========
-    const weatherKeywords = [
-        'wetter', 'weather', 'temperatur', 'temperature', 'forecast', 'regen', 'rain',
-        'schnee', 'snow', 'sonne', 'sun', 'wolken', 'cloud', 'wind', 'gust',
-        'wie wird das wetter', 'what\'s the weather', 'wettervorhersage'
-    ];
-    
-    const isWeatherQuestion = weatherKeywords.some(kw => lower.includes(kw)) ||
-                              (conversationTopic.get(ip) === 'weather' && (lower.includes('based on') || lower.includes('recommend') || lower.includes('what to do')));
-    
-    if (isWeatherQuestion) {
-        let lang = currentLang;
-        const isFollowUp = conversationTopic.get(ip) === 'weather' && (lower.includes('based on') || lower.includes('recommend') || lower.includes('what to do'));
-        
+    if (shouldFetchWeather) {
         try {
             const now = Date.now();
-            let weatherData = null;
-            
-            if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
-                console.log('🌤️ Weather: Using cached data for chat');
-                weatherData = weatherCache.data;
-            } else {
-                console.log('🌤️ Weather: Cache expired, fetching fresh for chat');
-                weatherData = await getWeatherData();
-                if (weatherData) {
-                    weatherCache = { 
-                        data: weatherData, 
-                        timestamp: now, 
-                        expiryMs: 1800000 
-                    };
-                }
-            }
-            
-            if (!weatherData) {
-                throw new Error('No weather data available');
-            }
-            
-            // Store the topic for follow-ups
-            conversationTopic.set(ip, 'weather');
-            
-            let reply = '';
-            
-            // If this is a follow-up about recommendations
-            if (isFollowUp || lower.includes('based on weather') || lower.includes('what to do') || lower.includes('recommend')) {
-                // Let the AI handle recommendations with weather context
-                const weatherContext = `Current weather in ${weatherData.city}: ${weatherData.current.temp}°C, ${weatherData.current.condition}. Forecast: ${weatherData.forecast.map(d => `${d.day}: ${d.high}°C / ${d.low}°C, ${d.condition}`).join(' | ')}`;
-                
-                const followUpPrompt = `Based on this weather information:\n${weatherContext}\n\nThe guest is asking: "${question}"\n\nProvide helpful recommendations for activities in Salzburg based on the weather. If it's rainy, suggest indoor activities. If it's sunny, suggest outdoor activities. Be specific and include bus routes if applicable.`;
-                
-                const followUpResponse = await axios.post('https://api.mistral.ai/v1/chat/completions', {
-                    model: "mistral-small-2501",
-                    messages: [{ role: "user", content: followUpPrompt }],
-                    temperature: 0.6,
-                    max_tokens: limitsConfig.maxTokens
-                }, {
-                    headers: { 
-                        'Authorization': `Bearer ${apiKey}`, 
-                        'Content-Type': 'application/json' 
-                    },
-                    timeout: 25000
-                });
-                
-                reply = followUpResponse.data.choices[0].message.content;
-                reply = reply.replace(/\?$/, '.');
-                reply = reply.replace(/ Would you like.*$/s, '');
-                reply = reply.replace(/ Can I help.*$/s, '');
-                
-                if (followUpResponse.data.usage) {
-                    updateAnalytics(followUpResponse.data.usage, 'weather', question);
-                }
-            } else {
-                // Regular weather response
-                if (lang === 'de') {
-                    reply = `🌤️ **Wetter in ${weatherData.city}**\n\n`;
-                    reply += `**Aktuell:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
-                    reply += `**Wind:** ${weatherData.current.wind} km/h\n\n`;
-                    reply += `**3-Tage-Vorhersage:**\n`;
-                    for (const day of weatherData.forecast) {
-                        reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
-                    }
-                } else if (lang === 'zh') {
-                    reply = `🌤️ **${weatherData.city}天气**\n\n`;
-                    reply += `**当前:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
-                    reply += `**风速:** ${weatherData.current.wind} km/h\n\n`;
-                    reply += `**3天预报:**\n`;
-                    for (const day of weatherData.forecast) {
-                        reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
-                    }
-                } else {
-                    reply = `🌤️ **Weather in ${weatherData.city}**\n\n`;
-                    reply += `**Current:** ${weatherData.current.temp}°C, ${weatherData.current.condition}\n`;
-                    reply += `**Wind:** ${weatherData.current.wind} km/h\n\n`;
-                    reply += `**3-Day Forecast:**\n`;
-                    for (const day of weatherData.forecast) {
-                        reply += `• ${day.day}: ${day.high}°C / ${day.low}°C, ${day.condition}\n`;
-                    }
-                }
-            }
-            
-            analytics.q++;
-            const norm = question.toLowerCase().substring(0, 100);
-            analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-            checkAndSaveAnalytics();
-            
-            history.push({ role: "user", content: question.substring(0, 300) });
-            history.push({ role: "assistant", content: reply });
-            if (history.length > 15) history.splice(0, 3);
-            conversationMemory.set(ip, history);
-            
-            return res.json({ reply });
-            
-        } catch (error) {
-            console.error('🌤️ Weather error in chat:', error.message);
-            const fallbackReply = getFallbackResponse(currentLang, 'weather');
-            return res.json({ reply: fallbackReply });
-        }
+            if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) weatherContext = weatherCache.data;
+            else { weatherContext = await getWeatherData(); if (weatherContext) weatherCache = { data: weatherContext, timestamp: now, expiryMs: 1800000 }; }
+        } catch (e) { console.log('Weather fetch failed:', e.message); }
     }
     
-    // ========== BUS SCHEDULE QUESTIONS ==========
-    const busKeywords = ['bus 21', 'bus21', 'bus 120', 'bus120', 'bus 121', 'bus121', 'bus 150', 'bus150', 'bus 840', 'bus840', 'bus 151', 'bus151', 'bus 25', 'bus25', 'next bus', 'bus schedule', 'bus times'];
-    const isBusQuestion = busKeywords.some(kw => lower.includes(kw)) || 
-                          (lower.includes('bus') && (lower.includes('abfahrtszeiten') || lower.includes('fahrplan') || lower.includes('schedule') || lower.includes('wann fährt') || lower.includes('when does'))) ||
-                          (conversationTopic.get(ip) === 'bus' && (lower.includes('what about') || lower.includes('and') || lower.includes('also')));
-    
-    if (isBusQuestion) {
-        let busNumber = null;
-        let direction = 'citycenter';
-        let lang = currentLang;
-        
-        const busMatch = lower.match(/bus\s*(\d{2,3})/);
-        if (busMatch) {
-            busNumber = busMatch[1];
-        } else if (lower.includes('21') || lower.includes('city center') || lower.includes('stadtzentrum')) {
-            busNumber = '21';
-            direction = 'citycenter';
-        } else if (lower.includes('120') || lower.includes('121')) {
-            busNumber = lower.includes('121') ? '121' : '120';
-            direction = 'trainstation';
-        } else if (lower.includes('150')) {
-            busNumber = '150';
-            direction = 'citycenter';
-        } else if (lower.includes('840')) {
-            busNumber = '840';
-            direction = 'citycenter';
-        } else if (lower.includes('151')) {
-            busNumber = '151';
-            direction = 'citycenter';
-        } else if (lower.includes('25')) {
-            busNumber = '25';
-            direction = 'citycenter';
-        } else {
-            busNumber = '21';
-            direction = 'citycenter';
-        }
-        
-        if (lower.includes('stadtzentrum') || lower.includes('city center') || lower.includes('zentrum') || lower.includes('old town') || lower.includes('altstadt')) {
-            direction = 'citycenter';
-        } else if (lower.includes('hauptbahnhof') || lower.includes('train station') || lower.includes('hbf')) {
-            direction = 'trainstation';
-        } else if (busNumber === '120' || busNumber === '121') {
-            direction = 'trainstation';
-        } else if (busNumber === '21') {
-            direction = 'citycenter';
-        } else if (busNumber === '150' || busNumber === '840' || busNumber === '151' || busNumber === '25') {
-            direction = 'citycenter';
-        }
-        
-        // Store the topic for follow-ups
-        conversationTopic.set(ip, 'bus');
-        
-        const times = await getBusSchedule(busNumber, direction);
-        let reply = formatBusResponse(busNumber, times, direction, lang);
-        
-        analytics.q++;
-        const norm = question.toLowerCase().substring(0, 100);
-        analytics.topQ.set(norm, (analytics.topQ.get(norm) || 0) + 1);
-        checkAndSaveAnalytics();
-        
-        history.push({ role: "user", content: question.substring(0, 300) });
-        history.push({ role: "assistant", content: reply });
-        if (history.length > 15) history.splice(0, 3);
-        conversationMemory.set(ip, history);
-        
-        return res.json({ reply });
+    const busHint = ['bus', 'busse', 'abfahrt', 'depart', 'schedule', 'fahrplan', 'next bus', 'nächster bus', 'trainstation', 'hauptbahnhof', 'hbf', 'city center', 'stadtzentrum', 'altstadt'];
+    if (busHint.some(kw => lower.includes(kw))) {
+        try {
+            const busMatch = lower.match(/bus\s*(\d{2,3})/);
+            const toTrainStation = lower.includes('120') || lower.includes('121') || lower.includes('train') || lower.includes('hbf') || lower.includes('hauptbahnhof');
+            let direction = toTrainStation ? 'trainstation' : 'citycenter';
+            let fetchBusNumber = busMatch ? busMatch[1] : (toTrainStation ? '120' : '21');
+            const times = await getBusSchedule(fetchBusNumber, direction);
+            if (times?.length) busContext = { busNumber: fetchBusNumber, direction, times };
+        } catch (e) { console.log('Bus fetch failed:', e.message); }
     }
     
-    // ========== AI RESPONSE ==========
+    // ========== 6. BUILD CONTEXT FOR AI ==========
+    let liveDataContext = '';
+    if (weatherContext) {
+        liveDataContext += `\n# LIVE WEATHER DATA (Use this, don't make up weather)\n`;
+        liveDataContext += `Current: ${weatherContext.current.temp}°C, ${weatherContext.current.condition}, Wind: ${weatherContext.current.wind} km/h\n`;
+        liveDataContext += `Forecast: ${weatherContext.forecast.map(d => `${d.day}: ${d.high}/${d.low}°C, ${d.condition}`).join(' | ')}\n`;
+    }
+    if (busContext) {
+        const dirName = busContext.direction === 'trainstation' ? 'Train Station (Hauptbahnhof)' : 'City Center (Fürstenbrunn)';
+        liveDataContext += `\n# LIVE BUS DEPARTURES (Use exact times, don't make them up)\n`;
+        liveDataContext += `Bus ${busContext.busNumber} towards ${dirName} from Baron Schwarz Park:\n`;
+        liveDataContext += busContext.times.map(t => `- ${t.time}${t.delay > 0 ? ` (+${t.delay} min delay)` : ''}`).join('\n');
+        liveDataContext += `\nBus stop: Baron Schwarz Park (30m from hotel). Ride is FREE with Guest Mobility Ticket.\n`;
+    }
+    
+    // ========== 7. CALL AI (Proper Message Structure) ==========
     const faqContent = loadFAQs();
-    const historyText = history.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n');
-    const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-    const weekDayNote = isWeekend ? '\n- Heute ist Wochenende oder Feiertag. Busse fahren seltener.' : '';
+    const langInstructions = { en: 'Respond in English.', de: 'Antworte auf Deutsch.', zh: '用中文回复。', es: 'Responde en español.', fr: 'Répondez en français.', it: 'Rispondi in italiano.' };
     
-    // Get the last topic for context
-    const lastTopic = conversationTopic.get(ip) || 'general';
-    const topicContext = lastTopic !== 'general' ? `\nLetztes Thema: ${lastTopic}` : '';
+    const messages = [
+        { role: "system", content: `${SYSTEM_PROMPT}\n\n# SPRACHINSTRUKTION\n${langInstructions[currentLang] || langInstructions.en}\n\n# HOTEL FAQ\n${faqContent}${liveDataContext}` }
+    ];
     
-    const langInstructions = {
-        en: 'Respond in English.',
-        de: 'Antworte auf Deutsch.',
-        zh: '用中文回复。',
-        es: 'Responde en español.',
-        fr: 'Répondez en français.',
-        it: 'Rispondi in italiano.'
-    };
+    for (const msg of history.slice(-6)) messages.push({ role: msg.role, content: msg.content });
+    messages.push({ role: "user", content: question });
     
-    const systemPrompt = `${SYSTEM_PROMPT}
-
-# SPRACHINSTRUKTION
-${langInstructions[currentLang] || langInstructions.en}
-
-# HOTEL-INFORMATIONEN
-${faqContent}
-
-${weekDayNote}
-
-${topicContext}
-
-# GESPRÄCHSVERLAUF (Nutze diesen Kontext für Folge-Fragen)
-${historyText || 'Kein vorheriger Verlauf.'}
-
-# FRAGE DES GASTES
-${question}
-
-# ANTWORT (in der Sprache des Gastes)`;
-
     try {
         const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
             model: "mistral-small-2501",
-            messages: [{ role: "user", content: systemPrompt }],
+            messages: messages,
             temperature: 0.5,
             max_tokens: limitsConfig.maxTokens
-        }, {
-            headers: { 
-                'Authorization': `Bearer ${apiKey}`, 
-                'Content-Type': 'application/json' 
-            },
-            timeout: 25000
-        });
+        }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 25000 });
         
-        let reply = response.data.choices[0].message.content;
-        
-        reply = reply.replace(/\?$/, '.');
-        reply = reply.replace(/ Would you like.*$/s, '');
-        reply = reply.replace(/ Can I help.*$/s, '');
-        reply = reply.replace(/ Is there anything.*$/s, '');
-        reply = reply.replace(/ Let me know if.*$/s, '');
-        reply = reply.replace(/ Feel free to.*$/s, '');
+        let reply = response.data.choices[0].message.content.replace(/\?\s*$/g, '.');
         
         if (response.data.usage) {
-            let cat = 'gen';
-            if (lower.includes('bus') || lower.includes('fahrplan') || lower.includes('abfahrt')) cat = 'bus';
-            else if (lower.includes('wetter') || lower.includes('weather') || lower.includes('temp')) cat = 'wthr';
-            else if (lower.includes('restaurant') || lower.includes('essen') || lower.includes('food')) cat = 'food';
-            else if (lower.includes('sehenswürdigkeiten') || lower.includes('sightseeing') || lower.includes('attraction')) cat = 'sght';
+            let cat = 'gen'; if (busContext) cat = 'bus'; else if (weatherContext) cat = 'wthr';
             updateAnalytics(response.data.usage, cat, question);
         }
         
-        // Update the topic based on the question
-        if (lower.includes('sightseeing') || lower.includes('sehenswürdigkeiten') || lower.includes('attraction') || lower.includes('what to do')) {
-            conversationTopic.set(ip, 'sightseeing');
-        } else if (lower.includes('restaurant') || lower.includes('essen') || lower.includes('food')) {
-            conversationTopic.set(ip, 'restaurant');
-        } else {
-            conversationTopic.set(ip, 'general');
-        }
-        
-        history.push({ role: "user", content: question.substring(0, 300) });
-        history.push({ role: "assistant", content: reply.substring(0, 500) });
-        if (history.length > 15) history.splice(0, 3);
-        conversationMemory.set(ip, history);
-        
+        history.push({ role: "user", content: question.substring(0, 300) }); history.push({ role: "assistant", content: reply.substring(0, 500) });
+        if (history.length > 6) history = history.slice(-6); conversationMemory.set(ip, history);
         res.json({ reply });
         
     } catch (error) {
-        console.error('Chat error:', error.message);
-        const fallbackReply = getFallbackResponse(currentLang, 'general');
-        res.json({ reply: fallbackReply });
+        console.error('AI Error:', error.message);
+        res.json({ reply: getFallbackResponse(currentLang, 'general') });
     }
 });
 
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
     console.log(`🤖 AI: Mistral Small 2501 (EU-hosted, GDPR-compliant)`);
     console.log(`💰 Pricing: Input $0.10/1M | Output $0.30/1M tokens`);
     console.log(`🔑 API Key: ${process.env.MISTRAL_API_KEY ? '✅ Loaded' : '❌ MISSING'}`);
-    console.log(`🌤️ Weather API: WeatherAPI.com (primary) + MET Norway (fallback), cached 30min`);
+    console.log(`🌤️ Weather: Primary + MET Norway fallback (cached 30min)`);
     console.log(`🚆 Bus API: ENABLED (cached 60s, with timezone fix)`);
-    console.log(`🌍 Language: Multi-language support (EN, DE, ZH, ES, FR, IT)`);
-    console.log(`🧠 Topic Memory: ENABLED (follow-up detection)`);
-    console.log(`📊 Hardcoded responses: ENABLED (check-in, wifi, breakfast, etc.)`);
-    console.log(`💾 Conversation: last 6 messages (improved context)`);
+    console.log(`🧠 Architecture: Hybrid (1-2 words = Free | Complex = AI + Live Data)`);
     console.log(`📁 Analytics: Auto-save every 5 min / 10 questions`);
-    console.log(`📁 Daily backups: Keeps last 3 days`);
-    console.log(`📁 Monthly backups: End of each month`);
-    console.log(`❤️ Health check: /health (for Render ping)`);
-    console.log(`📋 FAQ loaded: ${loadFAQs() !== "No FAQ" ? "YES" : "NO"}`);
-    console.log(`\n✅ GDPR Compliance:`);
-    console.log(`   • System prompt with 4 immutable privacy rules`);
-    console.log(`   • No personal data processing (Art. 4,5,6 DSGVO)`);
-    console.log(`   • Prompt injection protection`);
-    console.log(`   • Fallback to reception for uncertain cases`);
-    console.log(`\n✅ Chat Optimizations:`);
-    console.log(`   • Follow-up question detection`);
-    console.log(`   • Topic memory for context`);
-    console.log(`   • Weather-based recommendations`);
-    console.log(`   • Better error handling with fallbacks`);
-    console.log(`   • 6 message conversation history\n`);
+    console.log(`❤️ Health check: /health (for Render ping)\n`);
 });
