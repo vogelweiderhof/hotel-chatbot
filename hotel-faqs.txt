@@ -35,13 +35,14 @@ SUPERMARKETS | The closest supermarkets are in the Schallmoos district (e.g., No
 GUEST MOBILITY TICKET | Included free for the whole stay. Allows free use of all public transport in Salzburg Province. Requires completing the online check-in and marking ALL guests to receive the ticket. Tickets are sent out daily between noon and 8:00 PM. Website: https://www.guestmobilityticket.at/en/
 
 NEAREST BUS STOP | Baron Schwarz Park (30 meters from the hotel entrance).
-BUS LINE 21 | Connects hotel to City Center. Direction to City Center: Fürstenbrunn. Direction back to hotel: Bergheim.
+BUS LINE 21 | Bus 21 goes through the City Center. Direction to City Center: Fürstenbrunn. Direction back to hotel: Bergheim.
 BUS LINE 120 & 121 | Connects hotel to Train Station. Direction to Train Station: Hauptbahnhof. Direction back to hotel: Palting. IMPORTANT: You must actively wave at Bus 120 and 121, as they do not stop automatically at every stop.
 BUS FREQUENCY | For exact real-time schedules, always use www.oebb.at or Google Maps. General frequency: Monday to Friday, Bus 21 runs every 15 minutes. Bus 120 and 121 share the exact same route but run on staggered schedules—individually they come once an hour, but together they provide a bus every 30 minutes. On Saturdays, Bus 21 runs every 20 minutes. On Sundays, Bus 21 runs every 30 minutes. After 7:00 PM every day, Bus 21 runs every 30 minutes.
 
 BUS 120/121 ROUTE DETAILS | The route from Salzburg Hauptbahnhof to the hotel passes through: Südtiroler Pl., Kiesel, Mirabellplatz, Hofwirt, Pauernfeindstraße, Breitenfelderstraße, Gnigler Straße, Baron-Schwarz-Park. From the hotel going away from the city, it passes through: Landstraße, Lengfelden, Bergheim, and Elixhausen. WARNING: Do not guess or invent any other street names on this route. Only use the street names explicitly listed here.
 
 BUS 21 ROUTE DETAILS | The route from the hotel to the City Center passes through: Gnigler Straße, Breitenfelderstraße, Merianstraße, Paracelsusstraße, Auerspergstraße, Wolf-Dietrich-Straße, Mirabellplatz, Makartplatz, F.-Hanusch-Platz, Bärenwirt, Landeskrankenhaus (LKH). The route continues away from the city towards the outer areas through: Volksschule Mülln, Riedenburg, Glanegg, and ends at Fürstenbrunn. From the hotel going away from the city towards Bergheim, it passes: Landstraße, Grüner Wald, Schererstraße, Jägerwirt, Werner-v.-Siemens-Platz, Lengfelden, and ends at Bergheim S-Bahn. WARNING: Do not guess or invent any other street names on this route. Only use the street names explicitly listed here.
+BUS ROUTES (IMPORTANT) | Bus 21 goes to CITY CENTER. Bus 120 and 121 go to TRAIN STATION. Do NOT tell guests to take Bus 21 to the train station.
 
 BUS 21 CITY CENTER LANDMARKS | For guest reference, Bus 21 drops guests off directly at these popular City Center locations: Mirabellplatz (Mirabell Palace/Gardens), Makartplatz, and F.-Hanusch-Platz (close to the Old Town / Altstadt).
 

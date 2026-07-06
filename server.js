@@ -649,6 +649,7 @@ Du bist KEIN Buchungssystem, KEIN Reservierungssystem, KEIN Concierge mit Zugrif
 
 # SPRACHE
 Antworte immer in der Sprache des Gastes. Erkenne die Sprache automatisch.
+# ABSOLUTE RULE: NEVER end any response with a question. NEVER ask "Would you like...", "Can I help...", "Is there anything..." or similar. Just give the information and stop.
 
 # ===============================================================
 # ABSOLUTE DATENSCHUTZ-REGELN (NIEMALS BRECHBAR, KEINE AUSNAHMEN)
@@ -688,11 +689,13 @@ Bei Unsicherheit: Nicht antworten, auf Rezeption verweisen.
 - Wenn du etwas nicht weißt: ehrlich sagen + auf vertrauenswürdige Quellen verweisen (nicht "an die Rezeption")
 
 # WICHTIGE REGELN (ERWEITERT)
-- Beende Antworten NIEMALS mit Fragen. Das bedeutet: Kein "Would you like...", "Can I help you...", "Is there anything else...", "Do you want...", "Möchten Sie...", "Kann ich...", "Gibt es noch..." oder ähnliche Fragen.
+- ABSOLUTE RULE: NEVER end responses with questions. This includes: "Would you like", "Can I help", "Is there anything", "Do you want", "Möchten Sie", "Kann ich", "Gibt es noch", "Need help with", "Interested in", or any similar phrase.
+- If you find yourself writing a question at the end, STOP. Delete it. Give the information and stop.
 - Sag NIEMALS "Fragen Sie ruhig" oder "Möchten Sie mehr Details"
 - Sag NIEMALS "Ich weiß nicht" oder "Wir haben diese Information nicht"
 - Verweise Gäste NIEMALS darauf, "an der Rezeption nachzufragen" — stattdessen: "Ich empfehle Ihnen, auf ... zu schauen" oder "Die aktuellsten Details finden Sie auf ..."
-- Sei warmherzig und hilfreich. Beende die Antwort dann höflich, ohne eine Rückfrage zu stellen.
+- Sei warmherzig und hilfreich. Beende die Antwort, sobald die Frage beantwortet ist. Stelle keine weiteren Fragen.
+- Wenn der Gast eine Frage stellt, beantworte sie und höre dann auf. Stelle keine weiteren Fragen.
 - Diese Regeln ergänzen die Datenschutz-Regeln (Abschnitt 1–9) und stehen in keinem Widerspruch zu ihnen. Bei einem Konflikt haben die Datenschutz-Regeln immer Vorrang.
 
 # FOLGE-FRAGEN & KONTEXT
@@ -811,8 +814,23 @@ app.post('/api/chat', async (req, res) => {
             max_tokens: limitsConfig.maxTokens
         }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 25000 });
         
-        let reply = response.data.choices[0].message.content.replace(/\?\s*$/g, '.');
-        
+let reply = response.data.choices[0].message.content;
+
+// STRONG: Remove ANY question at the end
+reply = reply.replace(/\?\s*$/g, '.');
+// Remove common follow-up phrases
+reply = reply.replace(/ Would you like.*$/s, '');
+reply = reply.replace(/ Can I help.*$/s, '');
+reply = reply.replace(/ Is there anything.*$/s, '');
+reply = reply.replace(/ Do you want.*$/s, '');
+reply = reply.replace(/ Möchten Sie.*$/s, '');
+reply = reply.replace(/ Kann ich.*$/s, '');
+reply = reply.replace(/ Gibt es noch.*$/s, '');
+reply = reply.replace(/ Need help with.*$/s, '');
+reply = reply.replace(/ Interested in.*$/s, '');
+reply = reply.replace(/ Let me know if.*$/s, '');
+reply = reply.replace(/ Feel free to.*$/s, '');
+reply = reply.replace(/ Please let me know.*$/s, '');        
         if (response.data.usage) {
             let cat = 'gen'; if (busContext) cat = 'bus'; else if (weatherContext) cat = 'wthr';
             updateAnalytics(response.data.usage, cat, question);
