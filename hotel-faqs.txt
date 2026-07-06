@@ -1,101 +1,89 @@
-# HOTEL VOGELWEIDERHOF - FAQ
-# Format: QUESTION | ANSWER
-# Lines starting with # are ignored
+# HOTEL VOGELWEIDERHOF - FACT BASE
+# INSTRUCTION FOR AI: This document contains ONLY facts. Do not guess, assume, or invent details (like street names, walking routes, or scenery) that are not explicitly written here. If exact directions are missing, recommend Google Maps or the specific website.
 
-CHECK-IN TIME | 3:00 PM to 8:00PM.
-CHECK-OUT TIME | 11:00 AM
-WIFI PASSWORD | wifi password is small cases just: internet
+CHECK-IN TIME | 3:00 PM to 8:00 PM.
+CHECK-OUT TIME | 11:00 AM.
+LATE ARRIVAL | Keyboxes are located next to the entrance door of Building B. The access code is sent via email if arriving after 8:00 PM. We do not reveal codes to unverified individuals.
+EARLY CHECK-IN | Rooms are rarely ready before 3:00 PM. If you arrive early, you can leave your luggage at reception. We cannot guarantee access to a room before 3:00 PM.
+
 WIFI NETWORK | Vogelweiderhof
+WIFI PASSWORD | internet (lowercase only)
 
-LATE ARRIVAL | Keybox with keysafes for late Arrival are beside the entrance door of Building B. cannot really miss it. Information and Code for keysafe will be send if guest cannot arrive before 8pm.
+ONLINE CHECK-IN | Mandatory by Austrian law. Link is sent automatically 3 days before arrival. Required to receive the Guest Mobility Ticket.
 
-ONLINE CHECK-IN | Link for Online-Check-in will be send automatically 3 days before Arrival date. The online-check-in is mandatory by law, and is also necessary to get the Guest Mobility Ticket.
+DRINKING WATER | Tap water in Salzburg is potable and safe to drink. We do not provide bottled water or tea/coffee making facilities in the rooms.
 
-DRINKING WATER | We do not serve tea or coffee in the room. The tap water is potable. you can drink it without boiling it. 
+ROOM AMENITIES | Kettle, safe, small hotel fridge, shower gel, handwash, towels, bedding for each guest. Iron is not available in the rooms.
+HAIRDRYER | Wall-mounted hairdryers are available in all rooms.
+AIR CONDITIONING | Only 2 Family Rooms have AC. All other rooms have ceiling fans (operated by pull cord or remote). With remote: make sure the ceiling light/fan has electricity for the remote to work.
+HEATING | Electric heating element in every room.
+ROOM CARD | Keycard opens the room door and the main entrance. Any card (bank card, etc.) can be inserted into the room slot to activate electricity.
+BABY COT | Not available.
+SMOKING | All rooms are non-smoking. Smoking is only permitted on room terraces with the terrace door completely closed.
 
-ROOM AMENITIES | Kettle, Safe, small hotel fridge, shower/hairgel, handwash, towels, blanket and pillow for each Person. 
+BREAKFAST HOURS | 7:00 AM - 10:00 AM daily.
+BREAKFAST LOCATION | Building A (next to the main street).
+BREAKFAST COST | €14 per adult, €10 per child (age 5-10 years).
+RESTAURANT | We currently only serve breakfast. No lunch or dinner restaurant on-site. No room service available.
+LAUNDRY | No laundry service available.
 
-PAYMENT METHODS | We accept cash, credit cards (Visa, Mastercard), and debit cards. Payment is made at check-in.
-INVOICE | Invoices can be provided at check-out. Please let us know if you need a company invoice in advance. we will need full Company Details and email address. 
+PARKING | Free on-site parking. No reservation possible. Subject to availability.
+BICYCLE | No indoor bicycle storage room. An outdoor bicycle stand is located next to the entrance door.
 
-HEATING | Every room has heating element in it. 
-CHRISTMAS MARKET | The Salzburg Christmas Market is for example at Domplatz and Residenzplatz, easily reachable by Bus 21. there are also other smaller markets. of Course, only during Christmas Season. more info here: https://christkindlmarkt.co.at
+SUPERMARKETS | The closest supermarkets are in the Schallmoos district (e.g., Norma or Billa). Do not guess the exact street addresses for these; instead advise guests to search for "Norma Schallmoos" or "Billa Schallmoos" on Google Maps, as they can be reached with busses.
 
-SOUND OF MUSIC | The Sound of Music tour buses depart from Mirabellplatz. Bus 21 takes you directly there.
-BABY COT | sadly, no Baby cot available. 
-HAIRDRYER | a wall Hairdryers are available in all rooms.
-EARLY CHECK-IN | Early check-in is possible if the room is ready. Please ask at reception after 12:00 PM. We cannot guarantee early check-in in Advance and do not make promises.
+GUEST MOBILITY TICKET | Included free for the whole stay. Allows free use of all public transport in Salzburg Province. Requires completing the online check-in and marking ALL guests to receive the ticket. Tickets are sent out daily between noon and 8:00 PM. Website: https://www.guestmobilityticket.at/en/
 
-AIR CONDITION | only 2 of the Family Rooms have AC. All other Rooms have ceiling fan. two different Ceiling can types. It be either controlled on the fan it self with a pull cord, or via a small remote once it has electricity.
+NEAREST BUS STOP | Baron Schwarz Park (30 meters from the hotel entrance).
+BUS LINE 21 | Connects hotel to City Center. Direction to City Center: Fürstenbrunn. Direction back to hotel: Bergheim.
+BUS LINE 120 & 121 | Connects hotel to Train Station. Direction to Train Station: Hauptbahnhof. Direction back to hotel: Palting. IMPORTANT: You must actively wave at Bus 120 and 121, as they do not stop automatically at every stop.
+BUS FREQUENCY | For exact real-time schedules, always use www.oebb.at or Google Maps. General frequency: Monday to Friday, Bus 21 runs every 15 minutes. Bus 120 and 121 share the exact same route but run on staggered schedules—individually they come once an hour, but together they provide a bus every 30 minutes. On Saturdays, Bus 21 runs every 20 minutes. On Sundays, Bus 21 runs every 30 minutes. After 7:00 PM every day, Bus 21 runs every 30 minutes.
 
-ROOM CARD | Keycard opens the room door and the main entrance door. Please Keep it safe and return it after Check-out, just drop it into the Check-out bowl on reception desk. 
-The room Needs a Card for electricity, but it can be any Card, does not have to be the room keycard. 
+BUS 120/121 ROUTE DETAILS | The route from Salzburg Hauptbahnhof to the hotel passes through: Südtiroler Pl., Kiesel, Mirabellplatz, Hofwirt, Pauernfeindstraße, Breitenfelderstraße, Gnigler Straße, Baron-Schwarz-Park. From the hotel going away from the city, it passes through: Landstraße, Lengfelden, Bergheim, and Elixhausen. WARNING: Do not guess or invent any other street names on this route. Only use the street names explicitly listed here.
 
-GUEST MOBILITY TICKET Guest Mobility Ticket | Guest Mobility Ticket is free ticket for the whole Duration of the stay. It allows guest to use all public Transportation in Salzburg Province free of charge. During Online-Check-In make sure, to mark every one to receive the ticket. here is Website for more Information: https://www.guestmobilityticket.at/en/
+BUS 21 ROUTE DETAILS | The route from the hotel to the City Center passes through: Gnigler Straße, Breitenfelderstraße, Merianstraße, Paracelsusstraße, Auerspergstraße, Wolf-Dietrich-Straße, Mirabellplatz, Makartplatz, F.-Hanusch-Platz, Bärenwirt, Landeskrankenhaus (LKH). The route continues away from the city towards the outer areas through: Volksschule Mülln, Riedenburg, Glanegg, and ends at Fürstenbrunn. From the hotel going away from the city towards Bergheim, it passes: Landstraße, Grüner Wald, Schererstraße, Jägerwirt, Werner-v.-Siemens-Platz, Lengfelden, and ends at Bergheim S-Bahn. WARNING: Do not guess or invent any other street names on this route. Only use the street names explicitly listed here.
 
-BREAKFAST HOURS | 7:00 AM - 10:00 AM daily, in Building A.
-BREAKFAST COST | €14 per adult, €10 per child, age 5-10 years.
-BREAKFAST LOCATION | Building A. beside the main street. 
+BUS 21 CITY CENTER LANDMARKS | For guest reference, Bus 21 drops guests off directly at these popular City Center locations: Mirabellplatz (Mirabell Palace/Gardens), Makartplatz, and F.-Hanusch-Platz (close to the Old Town / Altstadt).
 
-PARKING | Free on-site parking available. no parking Reservation. parking is after availability. 
-BICYCLE | We have no indoor bicycle room, there is a bicycle stand beside the entrance door. 
+LOCATION | Schallmoos district, Salzburg.
+ADDRESS | Vogelweiderstraße 93/B, 5020 Salzburg, Austria.
+RECEPTION | Located in Building B, inside the courtyard.
+RECEPTION HOURS | Reception is located in Building B. If you need specific opening hours for today, please contact us directly at office@vogelweiderhof.at or +43 662 871223. If arriving after 8:00 PM, please write us an email, we will use a keysafe to deposit the keycard for you.
 
-RESTAURANT | currently we only serve breakfast.
+TRAIN STATION | Salzburg Hauptbahnhof (Hbf).
+TRAVEL FROM TRAIN STATION TO HOTEL | Do NOT provide custom walking routes for this trip as the path is not straight. Instead, recommend Bus 120 or 121 from the MAIN FRONT ENTRANCE of the station (takes 10-11 minutes, stop: Baron Schwarz Park). Alternatively, taxis are at the back entrance of the station (takes 3 minutes). For walking, strictly recommend Google Maps.
 
-ADDRESS | Hotel Vogelweiderhof, Vogelweiderstraße 93/B, 5020 Salzburg
-LOCATION | Located in Schallmoos. Bus 21 goes directly into City Center. Bus 120/121 to trainstation. Bus stop is just 30meters from the hotel. Bus from trainstation to hotel takes around 10-11 minutes.
-POSTAL CODE | 5020
-CITY | Salzburg
-COUNTRY | Austria
-NEAREST BUS STOP | Baron Schwarz Park, 30 meters from hotel.
-BUS LINES | Bus line 21 goes through the City Center. Bus line 120 and 121 go to the trainstation. Bus 21 does not go to trainstation, you will have to Change the line.
-BUS NAVIGATION | Use Google map as all bus lines are integrated. click on the bus stop to see the timer of when the next bus will arrive. The Website www.oebb.at Always up to date. Make sure to wave at bus 120/121, as they do not automatically stop at each stop. 
-BUS DIRECTION | From our hotel bus stop, "Baron Schwarz Park": Bus 21: for City Center the direction is Fürstenbrunn. Bus 120/121: for trainstation the direction is Hauptbahnhof. If you are coming from City Center/trainstation. the direction for bus 21 is Bergheim. The direction for bus 120/121 is Palting. 
+AIRPORT SHUTTLE | We do not offer an airport shuttle. To get from Salzburg Airport to the hotel, guests can take a taxi (approx. 15-20 minutes) or use the OBB train/bus network. We do not provide custom routing for this, please check Google Maps or www.oebb.at.
 
-WALKING TO CITY CENTER | Walking will take 30-45 minutes. the distance is around 2-2,5km. Easiest is to follow the Vogelweiderstraße towards the City Center, at the end of the street, turn Right and you will be Walking into the City Center. 
-TAXI | Taxi number is 0043 662 8111. Uber and some other ride Vehicle app also work, but may are limited in numbers. 
+WALKING TO CITY CENTER | Takes 30-45 minutes (2-2.5 km). Route: Follow Vogelweiderstraße towards the city, at the end of the street turn right. Do NOT use this route for guests coming FROM the train station.
+TAXI | Taxi number: 0043 662 8111. Uber is available but limited.
 
-RECEPTION | Reception of Hotel is in Building B. which is in the Courtyard. 
+HALLSTATT | Bus route has better views: Bus 150, change to 541, change to 543 at "Hallstatt Gosaumühle", get off at "Hallstatt Lahn". Guest Mobility Ticket is valid only up to Bad Ischl; a separate ticket is required from Bad Ischl to Hallstatt. Use www.oebb.at for routing.
 
+SALZBURGCARD | Includes entrance to sights/museums. Official site: https://www.salzburg.info/de/hotels-angebote/salzburg-card. Can be bought at reception or online. Warning: Buying from third-party websites only gives a voucher, which must be exchanged at the Tourist Info Point at the Train Station or Mozartplatz.
 
-GUEST MOBILITY TICKET | Guest mobility ticket is included for the whole stay. Online-check-in is necessary to receive the tickets. be sure to mark all persons to receive the tickets. only once the guest agrees to it, can we send it. link for online check-in will be send automatically 3 days before Arrival date. Guest mobility tickets will only be send our daily from around noon to 8pm evening. Guest Mobility Ticket allows you to use all public Transportation in Province Salzburg for free. 
-HALLSTATT | The stop beside Hallstatt lake is called "Hallstatt Lahn". Recommended to use www.oebb.at for Routing. Bus only route has better view. Bus 150, Change to BUS 541. Change form Bus 541 to Bus 543 at "Hallstatt Gosaumühle". Bus 543 will stop at Hallstatt Lahn, which is directly beside the Hallstatt lake. If you are going by Train, you will have to take the Ferry to cross the lake, as hallstatt trainstation is at other side of the lake. Guest Mobility Ticket is valid till Bad Ischl, so you only have to buy the ticket from Bad Ischl to Hallstatt.
+SIGHTS | Hohensalzburg Fortress, Mirabell Palace (free gardens), Mozart's Birthplace (Getreidegasse 9), Salzburg Cathedral. Haus der Nature, 
+CHRISTMAS MARKET | Located at Domplatz and Residenzplatz. Reachable by Bus 21. Only open during the Christmas season. Info: https://christkindlmarkt.co.at
+SOUND OF MUSIC | Tour buses depart from Mirabellplatz. Reachable by Bus 21.
 
-SALZBURGCARD | SalzburgCard includes entrances to different Sightseeing Locations and Museums. Official Website: https://www.salzburg.info/de/hotels-angebote/salzburg-card. SalzburgCard can be bought either at the reception or online. Buying SalzburgCard from third Party Website will only get you a Voucher, which you have to go to either Toruist Info Point at Transtation or Mozartplatz to Exchange for the real SalzburgCard. 
+NEARBY RESTAURANTS | Smash to Go (beside hotel, burgers, 15% discount for hotel guests), Mr. Cevap (1 min walk, Balkan grill), Turnerwirt (3 min walk, Austrian cuisine).
 
-EMERGENCY HOTLINES | Police: 133, Fire Brigade: 122, Ambulance: 144
+GYM | Fitness room available. Costs €15 per person per day. Get entrance card from reception during opening hours.
+SAUNA | Not available.
 
-ROOM PRICE | Please use the "Booking Now" button on the Homepage to open the booking engine, there you can set Dates and see Prices and availability. We should Always be one of the most economical hotel in whole Salzburg. 
+ROOM TYPES | Family room for 5 (with bunk bed), Small three-bed room (with sofa bed), Family room for 4, Small double room.
+TWIN BEDS | Requests must be made via email before Housekeeping is gone. Changes on the day of arrival cannot be guaranteed.
 
+PET RESTRICTIONS | Pets are not allowed.
 
-PET RESTRICTIONS | Not pet alllowed.
+CANCELLATION POLICY | Depends on the booked rate. However, cancellation less than 24 hours before arrival, or on the arrival date, will always incur a 100% room price cancellation fee.
 
-CANCELLATION POLICY | Cancellation Policy depending on the booked rate. But cancellation 1 days before Arrival date, or on Arrival date will Always incur the full 100% room Price as cancellation fee. 
-LATE CANCELLATION | 100% charge for no-show or cancellation within 24 Hours, regardless of booked rate.
+PAYMENT METHODS | Cash, Visa, Mastercard, Debit cards. Payment is made at check-in.
+INVOICE | Can be provided at check-out. For company invoices, full company details and email address must be provided in advance.
+TOURIST TAX | €3.55 per person per night (age 15 and above).
+CURRENCY | Euro (EUR).
 
+CONTACT EMAIL | office@vogelweiderhof.at
+CONTACT PHONE | +43 662 871223 (available until 11:00 PM).
 
-PHONE NUMBER | +43 662 871223 (till 23pm)
-EMAIL | office@vogelweiderhof.at
-
-ROOM SERVICE | no Room Service available.
-LAUNDRY SERVICE | no laundry Service available. 
-
-ROOM TYPES | family room for 5 with bunkbed, small threebedroom with Sofa bed, familyroom for 4, small double room
-
-TWINBED | Please do write us beforehand, changes on Arrival day cannot be guaranteed. 
-
-CHECK-IN LATE | Arrival after 8pm, please send us a message or email in Advance. 
-
-SMOKING | All rooms are non-smoking. Smoking allowed on Rooms terrace with closed terrace door. 
-
-AIRPORT SHUTTLE | no Transfer Services available
-NEAREST TRAIN STATION | Salzburg Hbf, 15 Walking distance, or 3 minutes by taxi from Trainstation back entrance. 
-
-RESTAURANT HOURS | currently no on premise Restaurant for lunch or dinner
-BAR HOURS | 
-
-SAUNA HOURS | no Sauna available.
-GYM | Fitness room avialable, entrance Card can be get from reception during reception Hours. it Costs 15€/Person/day.
-
-TOURIST TAX | € 3,55 per Person per night, for everyone Above age 15.
-CURRENCY ACCEPTED | Euro (EUR), credit cards accepted
+EMERGENCY NUMBERS | Police: 133 | Fire Brigade: 122 | Ambulance: 144

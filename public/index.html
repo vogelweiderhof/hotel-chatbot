@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Vogelweiderhof - AI Admin Panel</title>
+    <title>Hotel Vogelweiderhof - Admin Panel</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 20px; }
@@ -102,6 +102,8 @@
         button.success:hover { background: #c49162; }
         button.secondary { background: #6c757d; }
         button.secondary:hover { background: #5a6268; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #bd2130; }
         
         .status {
             margin-top: 12px;
@@ -123,39 +125,6 @@
         .limit-row label { flex: 1; margin: 0; font-size: 12px; }
         .limit-row input { flex: 1; margin: 0; width: auto; }
         .limit-row span { width: 60px; font-size: 11px; color: #666; }
-        
-        .toggle-switch {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #f8f9fa;
-            padding: 10px 12px;
-            border-radius: 8px;
-            margin: 12px 0;
-        }
-        .toggle-label { font-weight: bold; font-size: 12px; }
-        .toggle-button {
-            width: 50px;
-            height: 24px;
-            background: #ccc;
-            border-radius: 24px;
-            cursor: pointer;
-            position: relative;
-            transition: 0.3s;
-        }
-        .toggle-button.active { background: #588157; }
-        .toggle-button::after {
-            content: '';
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 3px;
-            transition: 0.3s;
-        }
-        .toggle-button.active::after { left: 27px; }
         
         .messages {
             height: 250px;
@@ -217,15 +186,6 @@
             border-bottom: 1px solid #eee;
         }
         
-        .rule-preview {
-            background: #e8f4fd;
-            padding: 8px;
-            border-radius: 6px;
-            margin-top: 8px;
-            font-size: 10px;
-            color: #588157;
-        }
-        
         .link-hint {
             background: #fff3cd;
             padding: 8px;
@@ -238,7 +198,6 @@
         
         .full-width { grid-column: span 3; }
         
-        /* Backup Browser Styles */
         .backup-browser {
             display: flex;
             gap: 10px;
@@ -277,7 +236,7 @@
     </style>
 </head>
 <body>
-    <h1>🏨 Hotel Vogelweiderhof - AI Assistant Admin Panel</h1>
+    <h1>🏨 Hotel Vogelweiderhof - Admin Panel</h1>
     
     <div class="chat-link-banner">
         <h3>💬 Guest Chat Interface</h3>
@@ -287,45 +246,9 @@
     </div>
     
     <div class="container">
-        <!-- PANEL 1: INITIAL SETUP -->
+        <!-- PANEL 1: LIMITS CONTROL -->
         <div class="panel">
-            <h2>📥 1. Initial Setup</h2>
-            <label>Bot Personality:</label>
-            <textarea id="personality" rows="3">Helpful hotel front desk agent at Hotel Vogelweiderhof.</textarea>
-            
-            <label>Safety Rules:</label>
-            <textarea id="safetyRules" rows="3">No credit cards. No guest data sharing.</textarea>
-            
-            <label>Style Rules:</label>
-            <textarea id="styleRules" rows="3">Direct, helpful, warm. Never end with questions.</textarea>
-            
-            <button onclick="setupBot()">📥 Load Setup</button>
-            <div id="status" class="status"></div>
-        </div>
-        
-        <!-- PANEL 2: LIVE RULES EDITOR -->
-        <div class="panel">
-            <h2>⚙️ 2. Edit Rules</h2>
-            <label>Personality:</label>
-            <textarea id="livePersonality" rows="2"></textarea>
-            
-            <label>Safety Rules:</label>
-            <textarea id="liveSafety" rows="2"></textarea>
-            
-            <label>Style Rules:</label>
-            <textarea id="liveStyle" rows="2"></textarea>
-            
-            <button onclick="updateRulesOnly()" class="success">🔄 Update Rules</button>
-            
-            <div class="link-hint">
-                💡 <strong>Guest Chat Link:</strong><br>
-                <span id="inlineChatLink">Loading...</span>
-            </div>
-        </div>
-        
-        <!-- PANEL 3: LIMITS CONTROL -->
-        <div class="panel">
-            <h2>🛡️ 3. Limits Control</h2>
+            <h2>⚙️ 1. Limits Control</h2>
             
             <div class="limit-row">
                 <label>Max tokens/response:</label>
@@ -357,9 +280,9 @@
             <div class="current-values" id="limitsDisplay">Loading...</div>
         </div>
         
-        <!-- PANEL 4: TEST CHAT -->
+        <!-- PANEL 2: TEST CHAT -->
         <div class="panel">
-            <h2>💬 4. Test Chat</h2>
+            <h2>💬 2. Test Chat</h2>
             <div class="messages" id="messages">
                 <div class="bot-msg">👋 Test your bot here.</div>
             </div>
@@ -367,18 +290,18 @@
             <button onclick="sendTestMessage()">Send</button>
         </div>
         
-        <!-- PANEL 5: ANALYTICS -->
+        <!-- PANEL 3: ANALYTICS -->
         <div class="panel">
-            <h2>📊 5. Analytics</h2>
+            <h2>📊 3. Analytics</h2>
             <div id="analyticsDisplay">
                 <div class="info-bg" style="padding: 10px; text-align: center;">Loading analytics...</div>
             </div>
             <button onclick="refreshAnalytics()" style="background: #D4A373;">🔄 Refresh Analytics</button>
         </div>
         
-        <!-- PANEL 6: TOKEN ANALYTICS & COSTS -->
+        <!-- PANEL 4: TOKEN ANALYTICS & COSTS -->
         <div class="panel">
-            <h2>💰 6. Token Analytics & Costs</h2>
+            <h2>💰 4. Token Analytics & Costs</h2>
             <div id="tokenAnalyticsDisplay">
                 <div class="info-bg" style="padding: 10px; text-align: center;">Loading token analytics...</div>
             </div>
@@ -388,9 +311,9 @@
             </div>
         </div>
         
-        <!-- PANEL 7: BACKUP BROWSER -->
+        <!-- PANEL 5: BACKUP BROWSER -->
         <div class="panel full-width">
-            <h2>📁 7. Backup Browser</h2>
+            <h2>📁 5. Backup Browser</h2>
             <div class="backup-browser">
                 <select id="backupSelect">
                     <option value="current">📊 Current Live Data</option>
@@ -409,7 +332,7 @@
                 <div class="info-bg" style="padding: 10px; text-align: center;">Select a backup to view</div>
             </div>
             <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="deleteSelectedBackup()" style="background: #dc3545; width: auto; padding: 8px 16px;">🗑️ Delete Selected</button>
+                <button onclick="deleteSelectedBackup()" class="danger" style="width: auto; padding: 8px 16px;">🗑️ Delete Selected</button>
                 <button onclick="restoreSelectedBackup()" style="background: #28a745; width: auto; padding: 8px 16px;">↩️ Restore as Current</button>
             </div>
             <div id="backupStatus" class="status"></div>
@@ -417,6 +340,32 @@
     </div>
     
     <script>
+        // ========== AUTHENTICATION CHECK ==========
+        async function checkAdminAuth() {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/verify', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                if (!data.valid) {
+                    localStorage.removeItem('adminToken');
+                    localStorage.removeItem('adminUsername');
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+        
         // ========== CHAT LINK ==========
         function getChatLink() {
             const url = window.location.href.split('/').slice(0, 3).join('/');
@@ -427,7 +376,6 @@
             const link = getChatLink();
             document.getElementById('chatLink').href = link;
             document.getElementById('chatLink').textContent = link;
-            document.getElementById('inlineChatLink').innerHTML = `<a href="${link}" target="_blank">${link}</a>`;
         }
         
         function copyChatLink() {
@@ -437,65 +385,6 @@
                 btn.textContent = '✅ Copied!';
                 setTimeout(() => btn.textContent = '📋 Copy Link', 2000);
             });
-        }
-        
-        // ========== SETUP ==========
-        async function setupBot() {
-            const data = {
-                personality: document.getElementById('personality').value,
-                safetyRules: document.getElementById('safetyRules').value,
-                styleRules: document.getElementById('styleRules').value
-            };
-            const status = document.getElementById('status');
-            status.innerHTML = '<div class="info-bg">⏳ Setting up...</div>';
-            
-            try {
-                const res = await fetch('/api/setup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await res.json();
-                if (result.success) {
-                    status.innerHTML = '<div class="success-bg">✅ Setup complete!</div>';
-                    loadCurrentRules();
-                } else {
-                    status.innerHTML = '<div class="error-bg">❌ Setup failed</div>';
-                }
-            } catch(e) {
-                status.innerHTML = '<div class="error-bg">❌ Connection error</div>';
-            }
-        }
-        
-        // ========== RULES EDITOR ==========
-        async function loadCurrentRules() {
-            try {
-                const res = await fetch('/api/get-rules');
-                const rules = await res.json();
-                document.getElementById('livePersonality').value = rules.personality || '';
-                document.getElementById('liveSafety').value = rules.safetyRules || '';
-                document.getElementById('liveStyle').value = rules.styleRules || '';
-            } catch(e) { console.error('Failed to load rules', e); }
-        }
-        
-        async function updateRulesOnly() {
-            const data = {
-                personality: document.getElementById('livePersonality').value,
-                safetyRules: document.getElementById('liveSafety').value,
-                styleRules: document.getElementById('liveStyle').value
-            };
-            
-            try {
-                const res = await fetch('/api/update-rules', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await res.json();
-                if (result.success) {
-                    addTestMessage('bot', '✨ Rules updated!');
-                }
-            } catch(e) { addTestMessage('bot', '❌ Error updating rules'); }
         }
         
         // ========== LIMITS ==========
@@ -634,14 +523,11 @@
                 const data = await res.json();
                 const select = document.getElementById('backupSelect');
                 
-                // Clear existing options (keep first two)
                 while (select.options.length > 2) {
                     select.remove(2);
                 }
                 
-                // Add backup files
                 if (data.backups && data.backups.length > 0) {
-                    // Add separator if not already there
                     if (select.options.length === 1) {
                         const sep = document.createElement('option');
                         sep.disabled = true;
@@ -687,13 +573,11 @@
                     return;
                 }
                 
-                // Update info
                 document.getElementById('backupDateLabel').textContent = data.label || filename;
                 document.getElementById('backupQuestions').textContent = data.q || 0;
                 document.getElementById('backupCost').textContent = data.cost ? `$${data.cost}` : '-';
                 document.getElementById('backupTimestamp').textContent = data.timestamp ? new Date(data.timestamp).toLocaleString() : '-';
                 
-                // Display analytics
                 const token = data.token || {};
                 const topQ = data.topQ || [];
                 
@@ -745,7 +629,6 @@
                 if (data.success) {
                     document.getElementById('backupStatus').innerHTML = '<div class="success-bg">✅ Backup deleted</div>';
                     refreshBackupList();
-                    // Reset display
                     document.getElementById('backupAnalyticsDisplay').innerHTML = '<div class="info-bg" style="padding: 10px; text-align: center;">Select a backup to view</div>';
                 } else {
                     document.getElementById('backupStatus').innerHTML = `<div class="error-bg">❌ ${data.error || 'Failed to delete'}</div>`;
@@ -790,17 +673,22 @@
         }
         
         // ========== INIT ==========
-        updateChatLink();
-        loadLimits();
-        loadCurrentRules();
-        refreshAnalytics();
-        refreshTokenAnalytics();
-        refreshBackupList();
-        
-        setInterval(updateChatLink, 5000);
-        setInterval(refreshAnalytics, 30000);
-        setInterval(refreshTokenAnalytics, 60000);
-        setInterval(refreshBackupList, 120000); // Refresh backup list every 2 minutes
+        // Check authentication before loading anything
+        document.addEventListener('DOMContentLoaded', async function() {
+            const auth = await checkAdminAuth();
+            if (!auth) return;
+            
+            updateChatLink();
+            loadLimits();
+            refreshAnalytics();
+            refreshTokenAnalytics();
+            refreshBackupList();
+            
+            setInterval(updateChatLink, 5000);
+            setInterval(refreshAnalytics, 30000);
+            setInterval(refreshTokenAnalytics, 60000);
+            setInterval(refreshBackupList, 120000);
+        });
     </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -24,6 +25,86 @@ app.use((req, res, next) => {
 // ========== FILE PATHS ==========
 const ANALYTICS_FILE = path.join(__dirname, 'analytics.json');
 const ANALYTICS_BACKUP = path.join(__dirname, 'analytics.json.bak');
+
+// ========== ADMIN AUTH ==========
+const adminTokens = new Map(); // token -> { username, expires }
+
+function generateAdminToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+// Login endpoint (PUBLIC - no auth required)
+app.post('/api/admin/login', (req, res) => {
+    const { username, password } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    
+    if (!adminPassword) {
+        console.error('❌ ADMIN_PASSWORD not set in environment variables');
+        return res.status(500).json({ success: false, error: 'Server configuration error' });
+    }
+    
+    if (username === 'admin' && password === adminPassword) {
+        const token = generateAdminToken();
+        adminTokens.set(token, { 
+            username, 
+            expires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+        });
+        res.json({ success: true, token });
+    } else {
+        res.status(401).json({ success: false });
+    }
+});
+
+// Verify token endpoint (PUBLIC - no auth required)
+app.get('/api/admin/verify', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ valid: false });
+    }
+    
+    const token = authHeader.substring(7);
+    const session = adminTokens.get(token);
+    
+    if (!session) {
+        return res.status(401).json({ valid: false });
+    }
+    
+    if (session.expires < Date.now()) {
+        adminTokens.delete(token);
+        return res.status(401).json({ valid: false });
+    }
+    
+    res.json({ valid: true, username: session.username });
+});
+
+// Logout endpoint
+app.post('/api/admin/logout', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        adminTokens.delete(token);
+    }
+    res.json({ success: true });
+});
+
+// ========== MIDDLEWARE: Protect Admin Routes ==========
+function requireAdminAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    const token = authHeader.substring(7);
+    const session = adminTokens.get(token);
+    
+    if (!session || session.expires < Date.now()) {
+        if (session) adminTokens.delete(token);
+        return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+    
+    req.adminUser = session.username;
+    next();
+}
 
 // ========== USER LANGUAGE STORAGE ==========
 const userLanguage = new Map();
@@ -300,9 +381,9 @@ async function getBusSchedule(busNumber, direction = 'citycenter') {
     return filtered.slice(0, 5).map(b => ({ time: convertToLocalTime(b.departureTime), delay: b.delay }));
 }
 
-// ========== PUBLIC API ENDPOINTS ==========
+// ========== PUBLIC API ENDPOINTS (No Auth Required) ==========
 
-// Bus Times
+// Bus Times (Public)
 app.get('/api/bus-times', async (req, res) => {
     const now = Date.now();
     if (busDataCache.data && busDataCache.timestamp && (now - busDataCache.timestamp) < busDataCache.expiryMs) {
@@ -325,7 +406,7 @@ app.get('/api/bus-times', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to fetch bus times' }); }
 });
 
-// Weather
+// Weather (Public)
 app.get('/api/weather', async (req, res) => {
     const now = Date.now();
     if (weatherCache.data && weatherCache.timestamp && (now - weatherCache.timestamp) < weatherCache.expiryMs) {
@@ -338,7 +419,7 @@ app.get('/api/weather', async (req, res) => {
     } else { res.status(500).json({ error: 'Failed to fetch weather' }); }
 });
 
-// Health Check
+// Health Check (Public)
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // ========== FAQ LOADER ==========
@@ -485,29 +566,81 @@ function checkRateLimit(ip) {
 
 setInterval(() => { const now = Date.now(); for (const [ip, data] of usageTracker.entries()) { if (now > data.dReset && now > data.mReset) usageTracker.delete(ip); } }, 3600000);
 
-// ========== ADMIN API ENDPOINTS ==========
-app.get('/api/analytics', (req, res) => {
+// ========== ADMIN API ENDPOINTS (Protected) ==========
+
+// Analytics (Protected)
+app.get('/api/analytics', requireAdminAuth, (req, res) => {
     const topQ = Array.from(analytics.topQ.entries()).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, c]) => ({ q, c }));
     const avg = analytics.q > 0 ? Math.round(analytics.tk / analytics.q) : 0;
     res.json({ q: analytics.q, topQ, sessions: analytics.sessions.size, startTime: analytics.startTime, token: { cost: analytics.cost.toFixed(4), inputCost: analytics.inputCost.toFixed(4), outputCost: analytics.outputCost.toFixed(4), tk: analytics.tk, pt: analytics.pt, ct: analytics.ct, avg, byCat: analytics.byCat, recent: analytics.recent } });
 });
 
-app.get('/api/limits', (req, res) => res.json(limitsConfig));
-app.post('/api/limits', (req, res) => { const { maxTokens, maxSession, maxMinute, dailyQuota } = req.body; if (maxTokens !== undefined) limitsConfig.maxTokens = maxTokens; if (maxSession !== undefined) limitsConfig.maxSession = maxSession; if (maxMinute !== undefined) limitsConfig.maxMinute = maxMinute; if (dailyQuota !== undefined) limitsConfig.dailyQuota = dailyQuota; res.json({ success: true }); });
+// Limits (Protected)
+app.get('/api/limits', requireAdminAuth, (req, res) => res.json(limitsConfig));
+app.post('/api/limits', requireAdminAuth, (req, res) => {
+    const { maxTokens, maxSession, maxMinute, dailyQuota } = req.body;
+    if (maxTokens !== undefined) limitsConfig.maxTokens = maxTokens;
+    if (maxSession !== undefined) limitsConfig.maxSession = maxSession;
+    if (maxMinute !== undefined) limitsConfig.maxMinute = maxMinute;
+    if (dailyQuota !== undefined) limitsConfig.dailyQuota = dailyQuota;
+    res.json({ success: true });
+});
 
-app.post('/api/reset-session', (req, res) => { const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'; const data = usageTracker.get(ip); if (data) data.s = 0; conversationMemory.delete(ip); userLanguage.delete(ip); res.json({ success: true }); });
+// Reset Session (Protected)
+app.post('/api/reset-session', requireAdminAuth, (req, res) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const data = usageTracker.get(ip);
+    if (data) data.s = 0;
+    conversationMemory.delete(ip);
+    userLanguage.delete(ip);
+    res.json({ success: true });
+});
 
-app.post('/api/setup', (req, res) => { const { personality, safetyRules, styleRules } = req.body; if (personality) botConfig.personality = personality; if (safetyRules) botConfig.safetyRules = safetyRules; if (styleRules) botConfig.styleRules = styleRules; res.json({ success: true }); });
-app.post('/api/update-rules', (req, res) => { const { personality, safetyRules, styleRules } = req.body; if (personality !== undefined) botConfig.personality = personality; if (safetyRules !== undefined) botConfig.safetyRules = safetyRules; if (styleRules !== undefined) botConfig.styleRules = styleRules; res.json({ success: true }); });
-app.get('/api/get-rules', (req, res) => res.json({ personality: botConfig.personality, safetyRules: botConfig.safetyRules, styleRules: botConfig.styleRules, bookingLink: botConfig.bookingLink }));
+// Backups (Protected)
+app.get('/api/backups', requireAdminAuth, (req, res) => {
+    try {
+        const files = fs.readdirSync(__dirname);
+        const backupFiles = files.filter(f => (f.startsWith('analytics-') && f.endsWith('.json')) || f === 'analytics.json' || f === 'analytics.json.bak');
+        backupFiles.sort((a, b) => { if (a === 'analytics.json') return -1; if (b === 'analytics.json') return 1; if (a === 'analytics.json.bak') return -1; if (b === 'analytics.json.bak') return 1; return b.localeCompare(a); });
+        res.json({ backups: backupFiles });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 
-app.get('/api/backups', (req, res) => { try { const files = fs.readdirSync(__dirname); const backupFiles = files.filter(f => (f.startsWith('analytics-') && f.endsWith('.json')) || f === 'analytics.json' || f === 'analytics.json.bak'); backupFiles.sort((a, b) => { if (a === 'analytics.json') return -1; if (b === 'analytics.json') return 1; if (a === 'analytics.json.bak') return -1; if (b === 'analytics.json.bak') return 1; return b.localeCompare(a); }); res.json({ backups: backupFiles }); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.get('/api/backup/:filename', requireAdminAuth, (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(__dirname, filename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' });
+        const data = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(data);
+        res.json({ label: filename.replace('analytics-', '').replace('.json', ''), q: parsed.q || 0, cost: parsed.cost || '0.0000', sessions: parsed.sessions ? parsed.sessions.length : 0, timestamp: parsed.savedAt || parsed.lastSaved || parsed.startTime, token: { cost: parsed.cost || '0.0000', tk: parsed.tk || 0, pt: parsed.pt || 0, ct: parsed.ct || 0, avg: parsed.q > 0 ? Math.round((parsed.tk || 0) / parsed.q) : 0, byCat: parsed.byCat || {}, recent: parsed.recent || [] }, topQ: Array.from(Object.entries(parsed.topQ || {})).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, c]) => ({ q, c })) });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 
-app.get('/api/backup/:filename', (req, res) => { try { const filename = req.params.filename; const filePath = path.join(__dirname, filename); if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' }); const data = fs.readFileSync(filePath, 'utf8'); const parsed = JSON.parse(data); res.json({ label: filename.replace('analytics-', '').replace('.json', ''), q: parsed.q || 0, cost: parsed.cost || '0.0000', sessions: parsed.sessions ? parsed.sessions.length : 0, timestamp: parsed.savedAt || parsed.lastSaved || parsed.startTime, token: { cost: parsed.cost || '0.0000', tk: parsed.tk || 0, pt: parsed.pt || 0, ct: parsed.ct || 0, avg: parsed.q > 0 ? Math.round((parsed.tk || 0) / parsed.q) : 0, byCat: parsed.byCat || {}, recent: parsed.recent || [] }, topQ: Array.from(Object.entries(parsed.topQ || {})).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([q, c]) => ({ q, c })) }); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.delete('/api/backup/:filename', requireAdminAuth, (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(__dirname, filename);
+        if (filename === 'analytics.json' || filename === 'analytics.json.bak') return res.status(400).json({ error: 'Cannot delete current analytics file' });
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' });
+        fs.unlinkSync(filePath);
+        res.json({ success: true });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 
-app.delete('/api/backup/:filename', (req, res) => { try { const filename = req.params.filename; const filePath = path.join(__dirname, filename); if (filename === 'analytics.json' || filename === 'analytics.json.bak') return res.status(400).json({ error: 'Cannot delete current analytics file' }); if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' }); fs.unlinkSync(filePath); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
-
-app.post('/api/restore-backup', (req, res) => { try { const { filename } = req.body; const backupPath = path.join(__dirname, filename); if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup file not found' }); const backupData = fs.readFileSync(backupPath, 'utf8'); const parsed = JSON.parse(backupData); fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(parsed, null, 2)); fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(parsed, null, 2)); restoreAnalytics(parsed); res.json({ success: true }); } catch (error) { res.status(500).json({ error: error.message }); } });
+app.post('/api/restore-backup', requireAdminAuth, (req, res) => {
+    try {
+        const { filename } = req.body;
+        const backupPath = path.join(__dirname, filename);
+        if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup file not found' });
+        const backupData = fs.readFileSync(backupPath, 'utf8');
+        const parsed = JSON.parse(backupData);
+        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(parsed, null, 2));
+        fs.writeFileSync(ANALYTICS_BACKUP, JSON.stringify(parsed, null, 2));
+        restoreAnalytics(parsed);
+        res.json({ success: true });
+    } catch (error) { res.status(500).json({ error: error.message }); }
+});
 
 // ========== GDPR-COMPLIANT SYSTEM PROMPT ==========
 const SYSTEM_PROMPT = `# ROLLE
@@ -565,7 +698,7 @@ Bei Unsicherheit: Nicht antworten, auf Rezeption verweisen.
 # FOLGE-FRAGEN & KONTEXT
 Wenn der Gast eine Folge-Frage stellt (z.B. "based on that", "what about", "and", "also", "wie sieht es mit", "und"), verwende den vorherigen Gesprächsverlauf, um zu verstehen, worauf sie sich bezieht. Verbinde die aktuelle Frage mit dem vorherigen Thema.`;
 
-// ========== MAIN CHAT ENDPOINT ==========
+// ========== MAIN CHAT ENDPOINT (Public) ==========
 app.post('/api/chat', async (req, res) => {
     const apiKey = process.env.MISTRAL_API_KEY;
     const question = req.body.userMessage;
@@ -635,7 +768,7 @@ app.post('/api/chat', async (req, res) => {
     const busHint = ['bus', 'busse', 'abfahrt', 'depart', 'schedule', 'fahrplan', 'next bus', 'nächster bus', 'trainstation', 'hauptbahnhof', 'hbf', 'city center', 'stadtzentrum', 'altstadt'];
     if (busHint.some(kw => lower.includes(kw))) {
         try {
-            const busMatch = lower.match(/bus\s*(\d{2,3})/);
+            const busMatch = lower.match(/bus\s*(\d{2,3})/) || lower.match(/bus(\d{2,3})/);
             const toTrainStation = lower.includes('120') || lower.includes('121') || lower.includes('train') || lower.includes('hbf') || lower.includes('hauptbahnhof');
             let direction = toTrainStation ? 'trainstation' : 'citycenter';
             let fetchBusNumber = busMatch ? busMatch[1] : (toTrainStation ? '120' : '21');
@@ -697,12 +830,13 @@ app.post('/api/chat', async (req, res) => {
 
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
     console.log(`\n✅ Hotel Chat Bot running on port ${PORT}`);
     console.log(`📍 Hotel: Vogelweiderstraße 93/B, 5020 Salzburg`);
     console.log(`🤖 AI: Mistral Small 2501 (EU-hosted, GDPR-compliant)`);
     console.log(`💰 Pricing: Input $0.10/1M | Output $0.30/1M tokens`);
     console.log(`🔑 API Key: ${process.env.MISTRAL_API_KEY ? '✅ Loaded' : '❌ MISSING'}`);
+    console.log(`🔐 Admin Login: ${process.env.ADMIN_PASSWORD ? '✅ Enabled' : '❌ Not set'}`);
     console.log(`🌤️ Weather: Primary + MET Norway fallback (cached 30min)`);
     console.log(`🚆 Bus API: ENABLED (cached 60s, with timezone fix)`);
     console.log(`🧠 Architecture: Hybrid (1-2 words = Free | Complex = AI + Live Data)`);

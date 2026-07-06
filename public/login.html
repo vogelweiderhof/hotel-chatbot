@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Hotel Vogelweiderhof</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #3A5E3C 0%, #588157 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .login-container h1 {
+            text-align: center;
+            color: #3A5E3C;
+            margin-bottom: 8px;
+            font-size: 1.5rem;
+        }
+        
+        .login-container .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        
+        .login-container label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .login-container input {
+            width: 100%;
+            padding: 12px 14px;
+            margin-bottom: 18px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .login-container input:focus {
+            border-color: #D4A373;
+            outline: none;
+        }
+        
+        .login-container button {
+            width: 100%;
+            padding: 12px;
+            background: #3A5E3C;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .login-container button:hover {
+            background: #588157;
+        }
+        
+        .login-container .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+        
+        .login-container .error.show {
+            display: block;
+        }
+        
+        .login-container .logo {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .login-container .hint {
+            text-align: center;
+            color: #999;
+            font-size: 11px;
+            margin-top: 16px;
+        }
+        
+        @media (max-width: 500px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">🏨</div>
+        <h1>Hotel Vogelweiderhof</h1>
+        <p class="subtitle">Admin Login</p>
+        
+        <div class="error" id="errorMessage">Invalid username or password</div>
+        
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter username" value="admin" autofocus>
+            
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Enter password">
+            
+            <button type="submit">Login</button>
+        </form>
+        
+        <p class="hint">🔒 Authorized personnel only</p>
+    </div>
+    
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const errorEl = document.getElementById('errorMessage');
+            
+            if (!username || !password) {
+                errorEl.textContent = 'Please enter both username and password';
+                errorEl.classList.add('show');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('adminToken', data.token);
+                    localStorage.setItem('adminUsername', username);
+                    window.location.href = '/index.html';
+                } else {
+                    errorEl.textContent = 'Invalid username or password';
+                    errorEl.classList.add('show');
+                    document.getElementById('password').value = '';
+                    document.getElementById('password').focus();
+                }
+            } catch (error) {
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.classList.add('show');
+            }
+        }
+        
+        // Check if already logged in
+        async function checkSession() {
+            const token = localStorage.getItem('adminToken');
+            if (token) {
+                try {
+                    const response = await fetch('/api/admin/verify', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    if (data.valid) {
+                        window.location.href = '/index.html';
+                    }
+                } catch (e) {
+                    // Token invalid, stay on login page
+                }
+            }
+        }
+        
+        // Enter key triggers login
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin(e);
+            }
+        });
+        
+        // Check session on load
+        checkSession();
+    </script>
+</body>
+</html>
