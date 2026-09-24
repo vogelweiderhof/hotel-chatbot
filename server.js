@@ -808,7 +808,7 @@ app.post('/api/chat', async (req, res) => {
     
     try {
         const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
-            model: "zai-glm-5-3",
+            model: "mistral-small-2501",
             messages: messages,
             temperature: 0.5,
             max_tokens: limitsConfig.maxTokens
