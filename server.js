@@ -726,7 +726,7 @@ app.post('/api/chat', async (req, res) => {
         if (lower.includes(phrase)) {
             userLanguage.set(ip, lang); const reply = getLanguageSwitchConfirmation(lang);
             history.push({ role: "user", content: question.substring(0, 300) }); history.push({ role: "assistant", content: reply });
-            if (history.length > 6) history = history.slice(-6); conversationMemory.set(ip, history); return res.json({ reply });
+            if (history.length > 6) history = history.slice(-12); conversationMemory.set(ip, history); return res.json({ reply });
         }
     }
     
@@ -836,7 +836,7 @@ reply = reply.replace(/ Please let me know.*$/s, '');
             updateAnalytics(response.data.usage, cat, question);
         }
         
-        history.push({ role: "user", content: question.substring(0, 300) }); history.push({ role: "assistant", content: reply.substring(0, 500) });
+        history.push({ role: "user", content: question.substring(0, 300) }); history.push({ role: "assistant", content: reply.substring(0, 2000) });
         if (history.length > 6) history = history.slice(-6); conversationMemory.set(ip, history);
         res.json({ reply });
         
